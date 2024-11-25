@@ -1,0 +1,7 @@
+.DS_Store
+backups
+oradata_old
+ords-config
+ords-secrets
+.env
+.env_old

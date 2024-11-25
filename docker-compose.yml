@@ -1,0 +1,45 @@
+name: docker-apex-24-1
+services:
+  23ai:
+    ports:
+      - 1521:1521
+    env_file:
+      - ./.env
+    volumes:
+      - oradata:/opt/oracle/oradata
+    restart: no
+    healthcheck:
+      test: ["CMD", "healthcheck.sh"]
+      #interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+      #start_interval: 5s
+    image: gvenzl/oracle-free:23.5-full
+    container_name: apex-24-1-23ai
+    #image: container-registry.oracle.com/database/free:23.5.0.0
+
+  ords:
+    ports:
+      - 8181:8181
+    volumes:
+      - type: bind
+        source: ords-secrets
+        target: /opt/oracle/variables
+      - type: bind
+        source: ords-config
+        target: /etc/ords/config
+    restart: no
+    depends_on:
+      23ai:
+        condition: service_healthy
+    image: container-registry.oracle.com/database/ords-developer:24.3.0
+    container_name: apex-24-1-ords
+
+networks:
+  default:
+    driver: bridge
+
+volumes:
+  oradata:
+    name: oradata
