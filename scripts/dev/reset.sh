@@ -1,9 +1,15 @@
 set -e
 
+source ./scripts/util/load_env.sh
+
 docker-compose stop || true
-docker rm apex-24-1-23ai || true
+docker rm $CONTAINER_NAME || true
 docker volume rm oradata || true
-rm .env || true
+
+if [ -f .env ]; then
+  rm .env
+fi
+
 ./setup.sh
 docker-compose up -d
 ./scripts/1-save-sqlcl-connection.sh
