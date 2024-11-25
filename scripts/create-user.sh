@@ -91,25 +91,37 @@ if [ "$skip_workspace" = true ]; then
         p_primary_schema     => '${USERNAME}' 
       );
 
+      commit;
+
       APEX_UTIL.SET_SECURITY_GROUP_ID(
         APEX_UTIL.FIND_SECURITY_GROUP_ID(p_workspace => '${USERNAME}')
       );
 
+      commit;
+
       APEX_UTIL.CREATE_USER(
-        p_user_name           => '${USERNAME}',
-        p_web_password        => 'Welcome_1',
-        p_email_address       => 'admin@localhost.com',
-        p_developer_privs     => 'CREATE:DATA_LOADER:EDIT:HELP:MONITOR:SQL',
+        p_user_name                    => '${USERNAME}',
+        p_web_password                 => 'Welcome_1',
+        p_email_address                => '${USERNAME}@localhost.com',
+        p_developer_privs              => 'ADMIN:CREATE:DATA_LOADER:EDIT:HELP:MONITOR:SQL',
+        p_default_schema               => '${USERNAME}',
+        p_allow_access_to_schemas      => '${USERNAME}',
         p_change_password_on_first_use => 'N'
       );
 
+      commit;
+
       APEX_UTIL.CREATE_USER(
-        p_user_name           => 'ADMIN',
-        p_web_password        => 'Welcome_1',
-        p_email_address       => 'admin@localhost.com',
-        p_developer_privs     => 'CREATE:DATA_LOADER:EDIT:HELP:MONITOR:SQL',
+        p_user_name                    => 'ADMIN',
+        p_web_password                 => 'Welcome_1',
+        p_email_address                => 'admin@localhost.com',
+        p_developer_privs              => 'ADMIN:CREATE:DATA_LOADER:EDIT:HELP:MONITOR:SQL',
+        p_default_schema               => '${USERNAME}',
+        p_allow_access_to_schemas      => '${USERNAME}',
         p_change_password_on_first_use => 'N'
       );
+
+      commit;
     END;
     /
     exit;
