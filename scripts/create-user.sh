@@ -129,6 +129,7 @@ SQL
 
   echo ">>>>"
   echo "created workspace. Access with username 'ADMIN' or ${USERNAME} and password 'Welcome_1'"
+  echo "http://localhost:8181/ords/r/apex/workspace-sign-in/oracle-apex-sign-in"
 
 fi
 
