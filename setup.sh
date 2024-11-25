@@ -6,8 +6,6 @@ source ./scripts/util/generate_password.sh
 
 # generate sys password
 SYS_PASSWORD=$(generate_password)
-APP_USER="APP_USER"
-APP_USER_PASSWORD=$(generate_password)
 
 # if .env exsits, rename to .env.bak
 if [ -f .env ]; then
@@ -15,14 +13,13 @@ if [ -f .env ]; then
 fi
 
 # write .env file with passwords
-echo "#ORACLE_PASSWORD = SYS_PASSWORD" >.env
-echo "ORACLE_PASSWORD=\"$SYS_PASSWORD\"" >>.env
+echo "ORACLE_PASSWORD=\"$SYS_PASSWORD\"" >.env
 echo "ORACLE_PWD=\"$SYS_PASSWORD\"" >>.env
-echo "APP_USER=\"$APP_USER\"" >>.env
-echo "APP_USER_PASSWORD=\"$APP_USER_PASSWORD\"" >>.env
+#echo "APP_USER=\"$APP_USER\"" >>.env
+#echo "APP_USER_PASSWORD=\"$APP_USER_PASSWORD\"" >>.env
 echo "DB_CONN_BASE=local-23ai" >>.env
 echo "DB_CONN_NAME=local-23ai-sys" >>.env
-echo "CONTAINER_NAME=apex-24-1-23ai" >>.env
+echo "CONTAINER_NAME=local-23ai" >>.env
 
 echo "Password written to .env file"
 
