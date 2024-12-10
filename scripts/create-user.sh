@@ -115,6 +115,34 @@ else
 
       commit;
 
+      -- increase the session timeout to 7 days
+      APEX_INSTANCE_ADMIN.SET_WORKSPACE_PARAMETER (
+        p_workspace   => '${USERNAME}',
+        p_parameter   => 'MAX_SESSION_IDLE_SEC',
+        p_value       => 604800
+      );
+
+      APEX_INSTANCE_ADMIN.SET_WORKSPACE_PARAMETER (
+        p_workspace   => '${USERNAME}',
+        p_parameter   => 'MAX_SESSION_LENGTH_SEC',
+        p_value       => 604800
+      );
+
+      APEX_INSTANCE_ADMIN.SET_WORKSPACE_PARAMETER (
+        p_workspace   => '${USERNAME}',
+        p_parameter   => 'ACCOUNT_LIFETIME_DAYS',
+        p_value       => 9999
+      );
+
+      APEX_INSTANCE_ADMIN.SET_WORKSPACE_PARAMETER (
+        p_workspace   => '${USERNAME}',
+        p_parameter   => 'ALLOW_HOSTING_EXTENSIONS',
+        p_value       => 'Y'
+      );
+
+      commit;
+
+
       apex_util.set_workspace( p_workspace => '${USERNAME}');
 
       commit;
@@ -154,34 +182,11 @@ else
     END;
     /
 
-    -- increase session timeout
-    declare
-      l_username varchar2(100);
-    begin
-      select creator 
-      into l_username
-      from PUBLICSYN where SNAME = 'APEX_UTIL'
-      fetch first 1 row only;
-
-      dbms_output.put_line('The creator of APEX_UTIL is ' || l_username);
-
-      execute IMMEDIATE ' update ' || l_username || q'!.wwv_flow_companies
-          set MAX_SESSION_IDLE_SEC = 604800
-            , MAX_SESSION_LENGTH_SEC = 604800
-        where short_name = '${USERNAME}'
-        !';
-
-      commit;
-
-    end;
-    /
-
-
     exit;
 SQL
 
   echo ">>>>"
-  echo "created workspace. Access with username 'ADMIN' or ${USERNAME} and password ' me'"
+  echo "created workspace. Access with username 'ADMIN' or ${USERNAME} and password 'Welcome_1'"
   echo "http://localhost:8181/ords/r/apex/workspace-sign-in/oracle-apex-sign-in"
 fi
 
