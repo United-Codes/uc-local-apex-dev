@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 set -e
 
 source ./scripts/util/load_env.sh

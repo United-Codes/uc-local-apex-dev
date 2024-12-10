@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 set -e
 
 source ./scripts/util/load_env.sh
@@ -51,6 +53,7 @@ sql -name $DB_CONN_NAME <<SQL
     default tablespace tbs_${USERNAME_LOWER}
   ;
 
+  grant db_developer_role to ${USERNAME};
   grant create session to ${USERNAME};
   grant create table to ${USERNAME};
   grant create view to ${USERNAME};
@@ -75,8 +78,24 @@ sql -name $DB_CONN_NAME <<SQL
   grant create property graph to ${USERNAME};
   grant execute dynamic mle to ${USERNAME};
 
+  grant debug connect session to ${USERNAME};
+  grant debug connect any to ${USERNAME};
+  grant debug any procedure to ${USERNAME};
+
   grant read, write on directory datapump_import_dir to ${USERNAME};
   grant read, write on directory datapump_export_dir to ${USERNAME};
+
+
+  -- allow debug
+  begin
+  DBMS_NETWORK_ACL_ADMIN.APPEND_HOST_ACE(
+    host => '*',
+    ace  =>  xs\$ace_type(privilege_list => xs\$name_list('jdwp'),
+                         principal_name => '${USERNAME}',
+                         principal_type => xs_acl.ptype_db));
+  end;
+  /
+
   exit;
 SQL
 
@@ -84,18 +103,19 @@ echo ">>>>"
 echo "created user"
 
 if [ "$skip_workspace" = true ]; then
+  echo ">>>>"
+  echo "skipped workspace creation"
+else
   sql -name $DB_CONN_NAME <<SQL
     BEGIN
-      APEX_INSTANCE_ADMIN.ADD_WORKSPACE (
-        p_workspace          => '${USERNAME}',
-        p_primary_schema     => '${USERNAME}' 
+      apex_instance_admin.add_workspace (
+        p_workspace      => '${USERNAME}',
+        p_primary_schema => '${USERNAME}' 
       );
 
       commit;
 
-      APEX_UTIL.SET_SECURITY_GROUP_ID(
-        APEX_UTIL.FIND_SECURITY_GROUP_ID(p_workspace => '${USERNAME}')
-      );
+      apex_util.set_workspace( p_workspace => '${USERNAME}');
 
       commit;
 
@@ -104,9 +124,8 @@ if [ "$skip_workspace" = true ]; then
         p_web_password                 => 'Welcome_1',
         p_email_address                => '${USERNAME}@localhost.com',
         p_developer_privs              => 'ADMIN:CREATE:DATA_LOADER:EDIT:HELP:MONITOR:SQL',
-        p_default_schema               => '${USERNAME}',
-        p_allow_access_to_schemas      => '${USERNAME}',
-        p_change_password_on_first_use => 'N'
+        p_change_password_on_first_use => 'N',
+        p_default_schema               => '${USERNAME}'
       );
 
       commit;
@@ -116,27 +135,66 @@ if [ "$skip_workspace" = true ]; then
         p_web_password                 => 'Welcome_1',
         p_email_address                => 'admin@localhost.com',
         p_developer_privs              => 'ADMIN:CREATE:DATA_LOADER:EDIT:HELP:MONITOR:SQL',
-        p_default_schema               => '${USERNAME}',
-        p_allow_access_to_schemas      => '${USERNAME}',
-        p_change_password_on_first_use => 'N'
+        p_change_password_on_first_use => 'N',
+        p_default_schema               => '${USERNAME}'
       );
+
+      commit;
+
+      for c1 in (select user_name from apex_workspace_apex_users) loop
+        begin
+          apex_util.unexpire_workspace_account(p_user_name => c1.user_name);
+        exception
+          when others then
+            null;
+        end;
+      end loop;
 
       commit;
     END;
     /
+
+    -- increase session timeout
+    declare
+      l_username varchar2(100);
+    begin
+      select creator 
+      into l_username
+      from PUBLICSYN where SNAME = 'APEX_UTIL'
+      fetch first 1 row only;
+
+      dbms_output.put_line('The creator of APEX_UTIL is ' || l_username);
+
+      execute IMMEDIATE ' update ' || l_username || q'!.wwv_flow_companies
+          set MAX_SESSION_IDLE_SEC = 604800
+            , MAX_SESSION_LENGTH_SEC = 604800
+        where short_name = '${USERNAME}'
+        !';
+
+      commit;
+
+    end;
+    /
+
+
     exit;
 SQL
 
   echo ">>>>"
-  echo "created workspace. Access with username 'ADMIN' or ${USERNAME} and password 'Welcome_1'"
+  echo "created workspace. Access with username 'ADMIN' or ${USERNAME} and password ' me'"
   echo "http://localhost:8181/ords/r/apex/workspace-sign-in/oracle-apex-sign-in"
-
 fi
 
 USER_DB_CONN_NAME="${DB_CONN_BASE}-${USERNAME_LOWER}"
 
 sql ${USERNAME_LOWER}/${USER_PASSWORD}@localhost:1521/FREEPDB1 <<SQL
   conn -save ${USER_DB_CONN_NAME} -savepwd -replace
+
+  begin
+    ords.enable_schema;
+  end;
+  /
+
   exit;
 SQL
 

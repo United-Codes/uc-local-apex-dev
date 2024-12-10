@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 generate_password() {
   # Generate random string with base64
   local base=$(openssl rand -base64 32)
