@@ -1,6 +1,48 @@
 # Oracle APEX Docker
 
+## Setup
+
+You need to run the following commands to setup the environment.
+
+```sh
+# setup the environment
+./setup.sh
+
+# start the containers
+docker-compose up -d
+
+# wait for ORDS to install APEX
+docker logs --follow local-ords
+# INFO : This container will start a service running ORDS 24.3.1 and APEX 24.1.0.
+# INFO : CONN_STRING has been found in the container variables file.
+# INFO : Database connection established.
+# INFO : Apex is not installed on your database.
+# INFO : Installing APEX on your DB please be patient.
+
+# wait for:
+# INFO : APEX has been installed.
+# INFO : Configuring APEX.
+# INFO : APEX_PUBLIC_USER has been configured as oracle.
+# INFO : APEX ADMIN password has configured as 'Welcome_1'.
+# INFO : Use below login credentials to first time login to APEX service:
+#         Workspace: internal
+#         User:      ADMIN
+#         Password:  Welcome_1
+
+
+# Run DB config script:
+./scripts/after-first-db-start.sh
+```
+
+Make sure you permission to run the scripts. If not, run the following command:
+
+```sh
+chmod +x ./setup.sh ./scripts/*.sh
+```
+
 ## APEX
+
+You can access any workspace with following credentials:
 
 URL: http://localhost:8181/ords/apex
 Username: admin
@@ -17,58 +59,10 @@ This command will create a new db schema and workspace. You can access the works
 ## Delete database data
 
 ```sh
-docker stop apex-24-1-23ai
-docker rm apex-24-1-23ai
+docker-compose down
 docker volume rm oradata
 ```
 
 
 ## Troubleshooting
 
-### ORA-01157
-
-ORA-01157: cannot identify/lock data file 20 - see DBWR trace file
-ORA-01110: data file 20: '/opt/oracle/product/23ai/dbhomeFree/dbs/tbs_test.dat'
-
-**I have no idea how to fix this.**
-
-Attempt:
-
-```
-docker run -it \
-  -v ./oradata:/opt/oracle/oradata \
-  --entrypoint /bin/bash \
-  -p 1521:1521 \
-  --env-file ./.env \
-  --rm \
-  gvenzl/oracle-free:23.5-full
-
-> sqlplus / as sysdba
-> alter database open;
-> STARTUP NOMOUNT;
-> ALTER DATABASE MOUNT;
-> ALTER SYSTEM CHECK DATAFILES;
-> ALTER DATABASE OPEN;
-# ERROR at line 1:
-# ORA-01157: cannot identify/lock data file 20 - see DBWR trace file
-# ORA-01110: data file 20: '/opt/oracle/product/23ai/dbhomeFree/dbs/tbs_test.dat'
-# Help: https://docs.oracle.com/error-help/db/ora-01157/
-> exit
-
-# check if file actually exists
-> ls -l /opt/oracle/product/23ai/dbhomeFree/dbs/tbs_test.dat
-ls: cannot access '/opt/oracle/product/23ai/dbhomeFree/dbs/tbs_test.dat': No such file or directory
-
-# remove the file from the database
-> sqlplus / as sysdba
-> ALTER DATABASE DATAFILE '/opt/oracle/product/23ai/dbhomeFree/dbs/tbs_test.dat' OFFLINE DROP;
-# ERROR at line 1:
-# ORA-01516: nonexistent log file, data file, or temporary file
-# "/opt/oracle/product/23ai/dbhomeFree/dbs/tbs_test.dat" in the current container
-# Help: https://docs.oracle.com/error-help/db/ora-01516/
-
-> alter tablespace tbs_test offline;
-# doesn't work
-> ALTER DATABASE DATAFILE 20 OFFLINE;
-# doesn't work
-```
