@@ -42,6 +42,8 @@ USER_PASSWORD=$(generate_password)
 echo "${USERNAME_UPPER}_USER_PASSWORD=\"$USER_PASSWORD\"" >>.env
 
 sql -name $DB_CONN_NAME <<SQL
+  select user from dual;
+
   create tablespace tbs_${USERNAME_LOWER}
     datafile 'tbs_${USERNAME_LOWER}.dat'
       size 10M
@@ -107,6 +109,8 @@ if [ "$skip_workspace" = true ]; then
   echo "skipped workspace creation"
 else
   sql -name $DB_CONN_NAME <<SQL
+    select user from dual;
+
     BEGIN
       apex_instance_admin.add_workspace (
         p_workspace      => '${USERNAME}',
@@ -193,6 +197,8 @@ fi
 USER_DB_CONN_NAME="${DB_CONN_BASE}-${USERNAME_LOWER}"
 
 sql ${USERNAME_LOWER}/${USER_PASSWORD}@localhost:1521/FREEPDB1 <<SQL
+  select user from dual;
+
   conn -save ${USER_DB_CONN_NAME} -savepwd -replace
 
   begin

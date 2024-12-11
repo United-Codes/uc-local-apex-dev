@@ -16,6 +16,8 @@ USERNAME_LOWER=$(echo $USERNAME | tr '[:upper:]' '[:lower:]')
 SQLCRED_NAME="${DB_CONN_BASE}-${USERNAME_LOWER}"
 
 sql -name $SQLCRED_NAME <<SQL
+  select user from dual;
+
   datapump import -
   -schemas ${USERNAME_LOWER} -
   -directory datapump_import_dir -
