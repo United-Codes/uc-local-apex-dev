@@ -20,11 +20,34 @@ This set of scripts aims to make developing APEX on your local machine as easy a
 
 ### On mac?
 
+You need the [homebrew](https://brew.sh/) package manager for this:
+
 ```sh
-brew install docker docker-compose podman sqlcl
+brew install docker docker-compose sqlcl
 ```
 
-And [read this](https://hartenfeller.dev/blog/sqlcl-homebrew-macos) on how to make SQLcl work fine after updates.
+Upgrade tolerant way of adding SQLcl to your PATH:
+
+```sh
+SQLCLPATH=$(ls -t $(brew --prefix)/Caskroom/sqlcl | head -1)
+PATH=$(brew --prefix)/Caskroom/sqlcl/$SQLCLPATH/sqlcl/bin:$PATH
+```
+
+[Read this](https://hartenfeller.dev/blog/sqlcl-homebrew-macos) for more information.
+
+If you have no docker runtime yet I recommend doing the following:
+
+```sh
+brew install podman
+
+podman machine init
+
+# I recommend increasing the resources if you have enough
+podman machine set --memory 4096
+podman machine set --cpus 3
+
+podman machine start
+```
 
 ## Setup
 
