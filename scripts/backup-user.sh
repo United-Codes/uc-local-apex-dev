@@ -53,7 +53,10 @@ sql -name $USER_DB_CONN_NAME <<SQL
     exit;
 SQL
 
-# check if ./backups/export/apex/$USERNAME_LOWER exists
+# move datapump from container to backups/export
+./scripts/sync-backups-folder.sh
+
+# create directory for APEX export
 if [ ! -d ./backups/export/apex/$USERNAME_LOWER ]; then
   mkdir -p ./backups/export/apex/$USERNAME_LOWER
 fi
@@ -71,5 +74,3 @@ sql -name $USER_DB_CONN_NAME <<SQL
 
     exit;
 SQL
-
-./scripts/sync-backups-folder.sh
