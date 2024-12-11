@@ -135,13 +135,25 @@ else
       APEX_INSTANCE_ADMIN.SET_WORKSPACE_PARAMETER (
         p_workspace   => '${USERNAME}',
         p_parameter   => 'ACCOUNT_LIFETIME_DAYS',
-        p_value       => 9999
+        p_value       => 99999
       );
 
       APEX_INSTANCE_ADMIN.SET_WORKSPACE_PARAMETER (
         p_workspace   => '${USERNAME}',
         p_parameter   => 'ALLOW_HOSTING_EXTENSIONS',
         p_value       => 'Y'
+      );
+
+      APEX_INSTANCE_ADMIN.SET_WORKSPACE_PARAMETER (
+        p_workspace   => '${USERNAME}',
+        p_parameter   => 'WORKSPACE_EMAIL_MAXIMUM',
+        p_value       => 100000
+      );
+
+      APEX_INSTANCE_ADMIN.SET_WORKSPACE_PARAMETER (
+        p_workspace   => '${USERNAME}',
+        p_parameter   => 'MAX_WEBSERVICE_REQUESTS',
+        p_value       => 100000
       );
 
       commit;
