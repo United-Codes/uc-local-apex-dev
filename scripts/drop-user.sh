@@ -23,6 +23,13 @@ if [[ $answer == "y" ]] || [[ $answer == "Y" ]]; then
   sql -name $DB_CONN_NAME <<SQL
     select user from dual;
 
+    begin
+      APEX_INSTANCE_ADMIN.REMOVE_WORKSPACE('${USERNAME_UPPER}');
+    end;
+    /
+
+    commit;
+
     DROP USER $USERNAME_UPPER CASCADE;
 
     exit;
