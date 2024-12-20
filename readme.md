@@ -1,4 +1,4 @@
-# Oracle APEX Docker
+# Containerized APEX Development Environment
 
 ## What is this?
 
