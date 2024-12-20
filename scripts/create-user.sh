@@ -5,6 +5,8 @@ set -e
 source ./scripts/util/load_env.sh
 source ./scripts/util/generate_password.sh
 source ./scripts/util/get_ws_settings.sh
+source ./scripts/util/user_in_env.sh
+source ./scripts/util/user-exists-in-db.sh
 
 skip_workspace=false
 
@@ -38,9 +40,28 @@ done
 
 USERNAME_UPPER=$(echo $USERNAME | tr '[:lower:]' '[:upper:]')
 USERNAME_LOWER=$(echo $USERNAME | tr '[:upper:]' '[:lower:]')
-USER_PASSWORD=$(generate_password)
 
-echo "${USERNAME_UPPER}_USER_PASSWORD=\"$USER_PASSWORD\"" >>.env
+# if user exists in .env file
+if user_in_env_bool $USERNAME; then
+
+  if user_exists_in_db $USERNAME; then
+    echo "User $USERNAME already exists in the database"
+    exit 0
+  fi
+
+  ENV_VAR=${USERNAME_UPPER}_USER_PASSWORD
+
+  if [ -z "${!ENV_VAR}" ]; then
+    echo "Error: User is listed in env but ${ENV_VAR} is empty"
+    exit 1
+  fi
+
+  USER_PASSWORD=${!ENV_VAR}
+else
+  # generate password and save to .env file
+  USER_PASSWORD=$(generate_password)
+  echo "${USERNAME_UPPER}_USER_PASSWORD=\"$USER_PASSWORD\"" >>.env
+fi
 
 sql -name $DB_CONN_NAME <<SQL
   select user from dual;
