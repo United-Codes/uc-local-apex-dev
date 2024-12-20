@@ -136,6 +136,14 @@ else
   sql -name $DB_CONN_NAME <<SQL
     select user from dual;
 
+    BEGIN
+      apex_instance_admin.add_workspace (
+        p_workspace      => '${USERNAME}',
+        p_primary_schema => '${USERNAME}' 
+      );
+
+      commit;
+
       $WS_SETTINGS
 
       apex_util.set_workspace( p_workspace => '${USERNAME}');
