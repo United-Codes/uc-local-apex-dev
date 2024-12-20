@@ -59,6 +59,15 @@ SQL
 # create directory for APEX export
 if [ ! -d ./backups/export/apex/$USERNAME_LOWER ]; then
   mkdir -p ./backups/export/apex/$USERNAME_LOWER
+else
+  # move existing files to backup folder
+  if [ ! -d ./backups/export/apex/bkp/$USERNAME_LOWER ]; then
+    mkdir -p ./backups/export/apex/bkp/$USERNAME_LOWER
+  else
+    # remove existing files
+    rm -rf ./backups/export/apex/bkp/$USERNAME_LOWER/* || true
+  fi
+  mv ./backups/export/apex/$USERNAME_LOWER/* ./backups/export/apex/bkp/$USERNAME_LOWER
 fi
 
 cd ./backups/export/apex/$USERNAME_LOWER
