@@ -9,51 +9,27 @@ This set of scripts aims to make developing APEX on your local machine as easy a
 - All users are stored for easy access with SQLcl or VS Code SQL Developer
 - Easily delete all data to test installation scripts multiple times
 - Backup and restore your data, workspaces and apps
+- Script to run ORDS with SSL
+
+**This is not for production use!** I configured the environment to be unsecure to make development as easy as possible. I also run some statements that are not supported and could be dangerous. So use this at your own risk and run backups regularly.
 
 ## Pre-requisites
 
 - Docker or Podman or any other docker compatible container runtime
   - Make sure your virtual machine has enough resources allocated. **The default Podman VM will cause issues with Oracle**. I recommend at least 4GB of RAM and 3 CPUs. [Find out more here](https://hartenfeller.dev/blog/oracle-23ai-container-wont-start-mac).
-- docker-compose
+- docker-compose / podman-compose
 - SQLcl + "sql" command in PATH
 - Bash compatible shell (I recommend using WSL2 on Windows)
 
 ### On mac?
 
-You need the [homebrew](https://brew.sh/) package manager for this:
-
-```sh
-brew install docker docker-compose sqlcl
-```
-
-Upgrade tolerant way of adding SQLcl to your PATH:
-
-```sh
-SQLCLPATH=$(ls -t $(brew --prefix)/Caskroom/sqlcl | head -1)
-PATH=$(brew --prefix)/Caskroom/sqlcl/$SQLCLPATH/sqlcl/bin:$PATH
-```
-
-[Read this](https://hartenfeller.dev/blog/sqlcl-homebrew-macos) for more information.
-
-If you have no docker runtime yet I recommend doing the following:
-
-```sh
-brew install podman
-
-podman machine init
-
-# I recommend increasing the resources if you have enough
-podman machine set --memory 4096
-podman machine set --cpus 3
-
-podman machine start
-```
+[Read this](./docs/podman-on-mac.md) for more information.
 
 ## Setup
 
 - Clone this repository
 - Start a terminal in the cloned directory
-- Run this:
+- Run this (change docker-compose to podman-compose if you use podman):
 
 ```sh
 # setup the environment
@@ -91,6 +67,21 @@ Make sure you permission to run the scripts. If you get errors, run the followin
 chmod +x ./setup.sh ./scripts/*.sh
 ```
 
+### Optional: SSL
+
+If you want to use SSL (https) run the following command:
+
+```sh
+sudo ./scripts/create-self-signed-certificates.sh
+docker-compose restart ords
+```
+
+Now you can access ORDS **only** with HTTPS: https://localhost:8181/ords/_/landing.
+
+The script will create a self-signed certificate and store it in your operating system's keychain. It is valid for 9999 days so you don't have to worry about renewing it.
+
+Note that I only tested this on macOS. It should work on Linux as well, but if you have issues please modify the script and create a pull request.
+
 ## Stopping the containers
 
 The containers will use some resources in the background. You can stop them with the following command:
@@ -125,7 +116,7 @@ alias apex-docker='cd /path/to/cloned-repo'
 
 This command will create a new db schema and workspace. You can access the workspace with both the username `ADMIN` or the given schema name and the password `Welcome_1`.
 
-``` sh
+```sh
 ./scripts/create-user.sh movies
 ```
 
@@ -147,12 +138,20 @@ The script will do the following:
 
 This is useful if you want to test install scripts multiple times. It will drop all objects in the schema.
 
-``` sh
+```sh
 ./scripts/clear-schema.sh {schema_name}
 # it will ask for confirmation
 ```
 
 From experience: never run it accidentally on sys :).
+
+### Drop a schema
+
+This will drop the schema and all objects in it. It will also remove the user from the database.
+
+```sh
+./scripts/drop-user.sh {schema_name}
+```
 
 ### Using the VS Code SQL Developer debugger
 
@@ -166,17 +165,34 @@ You can use the VS Code SQL Developer extension to debug your PL/SQL code. Any c
 
 ### Backup
 
+#### Backup all users
+
+This will create a datapump dump of all users. If there is an APEX workspace it will backup both the workspace defintion and the applications in them.
+
+```sh
+./scripts/backup-all.sh
+```
+
+
 #### Backup a specific schema
 
 This will create a datapump dump of the database schema. If there is an APEX workspace it will backup both the workspace defintion and the applications in it.
 
 The files are written to the `./backups/export` directory.
 
-``` sh
+```sh
 ./scripts/backup-schema.sh {schema_name}
 ```
 
-## Delete database data
+### Import Backup
+
+You can currently run `./scripts/import-backup.sh <schema-name>` to import a backup. Currently it does only create the user if it does not exist and import the data pump dump.
+
+In the future I want to add the possibility to import APEX workspaces and applications. Currently I need to future out:
+- What if the workspace already exists?
+- What if an application with this ID already exists?
+
+## Delete all database data
 
 If you want to delete your current databse (everything will be lost), you can run the following command:
 
@@ -195,6 +211,22 @@ If you follow the [setup](#setup) instructions again, you will have a fresh data
 
 Yes. A folder named `ords-config` will be created in the root directory. You can modify the config files there. The changes will be applied on the next restart of the ORDS container.
 
+### How can I upgrade the database version?
+
+This is a bit tricky. In the past datafiles were not compatible between versions. This is the reason I added the backup scripts. For the future I want to add a script that will then import everything again.
+
+### How can I ugprade ORDS?
+
+You can modify the `docker-compose.yml` file to use a different ORDS version. You can find the available versions [in the Oracle container registry](https://container-registry.oracle.com/ords/f?p=113).
+
+I will also update the github repository with the latest version of ORDS.
+
+## Contributing
+
+If you have any ideas on how to improve this setup, please create an issue or a pull request.
+
+I am especially thankful for improvements to the bash scripts.
+
 ## Troubleshooting
 
 ...soon
@@ -204,6 +236,7 @@ Yes. A folder named `ords-config` will be created in the root directory. You can
 
 - Tim Hall for the [drop_all.sql](https://oracle-base.com/dba/script?category=miscellaneous&file=drop_all.sql) script
 - Philipp Salvisberg for [helping me to figure out how to use the debugger](https://gist.github.com/PhilippSalvisberg/2f2853bc7a95fa86d9de9c0deab10602)
+- Scott Spendolini for his blog post on [how to add self-signed certificates to ORDS](https://spendolini.blog/adding-ssl-to-your-ords-container)
 - The database team for providing an ARM image for the Oracle database
 - The ORDS team for providing an ARM image for ORDS
 

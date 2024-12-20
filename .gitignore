@@ -5,3 +5,5 @@ ords-config
 ords-secrets
 .env
 .env_old
+**/cert.crt
+**/key.key
