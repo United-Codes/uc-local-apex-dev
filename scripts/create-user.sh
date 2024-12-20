@@ -4,6 +4,7 @@ set -e
 
 source ./scripts/util/load_env.sh
 source ./scripts/util/generate_password.sh
+source ./scripts/util/get_ws_settings.sh
 
 skip_workspace=false
 
@@ -108,56 +109,13 @@ if [ "$skip_workspace" = true ]; then
   echo ">>>>"
   echo "skipped workspace creation"
 else
+  # get workspace settings (extended session timeout, etc)
+  WS_SETTINGS=$(get_ws_settings $USERNAME)
+
   sql -name $DB_CONN_NAME <<SQL
     select user from dual;
 
-    BEGIN
-      apex_instance_admin.add_workspace (
-        p_workspace      => '${USERNAME}',
-        p_primary_schema => '${USERNAME}' 
-      );
-
-      commit;
-
-      -- increase the session timeout to 7 days
-      APEX_INSTANCE_ADMIN.SET_WORKSPACE_PARAMETER (
-        p_workspace   => '${USERNAME}',
-        p_parameter   => 'MAX_SESSION_IDLE_SEC',
-        p_value       => 604800
-      );
-
-      APEX_INSTANCE_ADMIN.SET_WORKSPACE_PARAMETER (
-        p_workspace   => '${USERNAME}',
-        p_parameter   => 'MAX_SESSION_LENGTH_SEC',
-        p_value       => 604800
-      );
-
-      APEX_INSTANCE_ADMIN.SET_WORKSPACE_PARAMETER (
-        p_workspace   => '${USERNAME}',
-        p_parameter   => 'ACCOUNT_LIFETIME_DAYS',
-        p_value       => 99999
-      );
-
-      APEX_INSTANCE_ADMIN.SET_WORKSPACE_PARAMETER (
-        p_workspace   => '${USERNAME}',
-        p_parameter   => 'ALLOW_HOSTING_EXTENSIONS',
-        p_value       => 'Y'
-      );
-
-      APEX_INSTANCE_ADMIN.SET_WORKSPACE_PARAMETER (
-        p_workspace   => '${USERNAME}',
-        p_parameter   => 'WORKSPACE_EMAIL_MAXIMUM',
-        p_value       => 100000
-      );
-
-      APEX_INSTANCE_ADMIN.SET_WORKSPACE_PARAMETER (
-        p_workspace   => '${USERNAME}',
-        p_parameter   => 'MAX_WEBSERVICE_REQUESTS',
-        p_value       => 100000
-      );
-
-      commit;
-
+      $WS_SETTINGS
 
       apex_util.set_workspace( p_workspace => '${USERNAME}');
 
