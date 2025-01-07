@@ -235,6 +235,23 @@ I will also update the github repository with the latest version of ORDS.
 sql -name local-23ai-sys @catpatch.sql
 ```
 
+To update the APEX images (assets):
+
+```sh
+# make sure you are in the directory of the unzipped patch directory
+
+# change to your base version number e.g. 24.1.0 even though it is 24.1.7
+#                                                        ↓ change here
+docker cp --archive ./images local-ords:/opt/oracle/apex/24.1.0/
+
+# if on podman use the podman alternative:
+# podman cp --archive ./images local-ords:/opt/oracle/apex/24.1.0/
+
+docker restart local-ords
+```
+
+Note that I still get the alert that the images are outdated even though they are not. Check if via this link: [http](http://localhost:8181/i/apex_version.js) / [https](https://localhost:8181/i/apex_version.js).
+
 ## Contributing
 
 If you have any ideas on how to improve this setup, please create an issue or a pull request.
