@@ -221,6 +221,20 @@ You can modify the `docker-compose.yml` file to use a different ORDS version. Yo
 
 I will also update the github repository with the latest version of ORDS.
 
+### How can I patch APEX?
+
+- You need a valid Oracle support account
+- Go to the [APEX Downloads Page](https://www.oracle.com/tools/downloads/apex-downloads/)
+- Click on Patch Set Bundle
+- Login with your Oracle account and download the zip file
+- Unzip the file
+- Start a terminal in the directory
+- Run the following command:
+
+```sh
+sql -name local-23ai-sys @catpatch.sql
+```
+
 ## Contributing
 
 If you have any ideas on how to improve this setup, please create an issue or a pull request.
