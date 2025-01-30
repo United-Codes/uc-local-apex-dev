@@ -16,7 +16,8 @@ services:
       start_period: 5s
       #start_interval: 5s
     container_name: local-23ai
-    image: container-registry.oracle.com/database/free:23.6.0.0
+    image: container-registry.oracle.com/database/free:23.5.0.0
+    #image: gvenzl/oracle-free:23.5-full
 
   ords:
     ports:
@@ -32,7 +33,7 @@ services:
     depends_on:
       23ai:
         condition: service_healthy
-    image: container-registry.oracle.com/database/ords-developer:24.4.0
+    image: container-registry.oracle.com/database/ords-developer:24.3.1
     container_name: local-ords
 
 networks:
