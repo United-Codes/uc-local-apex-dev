@@ -40,7 +40,7 @@ docker-compose up -d
 
 # wait for ORDS to install APEX
 docker logs --follow local-ords
-# INFO : This container will start a service running ORDS 24.3.1 and APEX 24.1.0.
+# INFO : This container will start a service running ORDS 24.4.0 and APEX 24.1.0.
 # INFO : CONN_STRING has been found in the container variables file.
 # INFO : Database connection established.
 # INFO : Apex is not installed on your database.
@@ -132,7 +132,7 @@ The script will do the following:
 - Add all developing necessary grants to the schema
 - Gives access to the datapump directories
 - Create a new workspace with the schema name
-  - Sets convinient settings like max session idle time to 7 days 
+  - Sets convenient settings like max session idle time to 7 days 
 
 ### Clear a schema
 
@@ -194,7 +194,7 @@ In the future I want to add the possibility to import APEX workspaces and applic
 
 ## Delete all database data
 
-If you want to delete your current databse (everything will be lost), you can run the following command:
+If you want to delete your current database (everything will be lost), you can run the following command:
 
 ```sh
 docker-compose down
