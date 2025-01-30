@@ -29,6 +29,8 @@ services:
         source: ords-config
         target: /etc/ords/config
     restart: no
+    env_file:
+      - ./.env.ords
     depends_on:
       23ai:
         condition: service_healthy

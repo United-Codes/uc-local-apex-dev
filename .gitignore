@@ -5,5 +5,8 @@ ords-config
 ords-secrets
 .env
 .env_old
+.env.ords
 **/cert.crt
 **/key.key
+apex/**/*
+META-INF/**/*
