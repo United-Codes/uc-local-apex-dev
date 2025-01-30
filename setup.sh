@@ -45,3 +45,5 @@ echo "credentails created"
 
 mkdir -p ./backups/export
 mkdir -p ./backups/import
+
+echo "IGNORE_APEX=FALSE" >.env.ords
