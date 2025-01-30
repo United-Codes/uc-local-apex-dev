@@ -30,6 +30,15 @@ if [[ $answer == "y" ]] || [[ $answer == "Y" ]]; then
 
     commit;
 
+    -- kill active sessions
+    BEGIN
+      FOR s IN (SELECT sid, serial# FROM v\$session WHERE username = '$USERNAME_UPPER')
+      LOOP
+        EXECUTE IMMEDIATE 'ALTER SYSTEM KILL SESSION ''' || s.sid || ',' || s.serial# || ''' IMMEDIATE';
+      END LOOP;
+    END;
+    /
+
     DROP USER $USERNAME_UPPER CASCADE;
 
     exit;
