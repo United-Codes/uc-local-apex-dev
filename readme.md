@@ -64,7 +64,7 @@ docker logs --follow local-ords
 Make sure you permission to run the scripts. If you get errors, run the following command:
 
 ```sh
-chmod +x ./setup.sh ./scripts/*.sh
+chmod +x ./local-23ai.sh ./setup.sh ./scripts/*.sh
 ```
 
 ### Optional: SSL
@@ -104,12 +104,17 @@ See [create user](#create-user-and-workspace) section.
 
 ## Common tasks
 
-**Run all scripts from the root directory of this repository.** Like `./scripts/...`.
 
-It can help to set up an alias to quickly cd into the directory:
+Add the cloned git repository to your PATH in your `.zshrc`.
+
+```sh 
+export PATH="/Users/phartenfeller/Documents/Docker/apex-24-1:$PATH"
+```
+
+Now you can call any script from anywhere.
 
 ```sh
-alias apex-docker='cd /path/to/cloned-repo'
+local-23ai.sh backup-all
 ```
 
 ### Create user and workspace
@@ -117,7 +122,7 @@ alias apex-docker='cd /path/to/cloned-repo'
 This command will create a new db schema and workspace. You can access the workspace with both the username `ADMIN` or the given schema name and the password `Welcome_1`.
 
 ```sh
-./scripts/create-user.sh movies
+local-23ai.sh create-user movies
 ```
 
 If you don't want to create a workspace, you can add the `--skip_workspace` flag.
@@ -139,7 +144,7 @@ The script will do the following:
 This is useful if you want to test install scripts multiple times. It will drop all objects in the schema.
 
 ```sh
-./scripts/clear-schema.sh {schema_name}
+local-23ai.sh clear-schema {schema_name}
 # it will ask for confirmation
 ```
 
@@ -150,7 +155,7 @@ From experience: never run it accidentally on sys :).
 This will drop the schema and all objects in it. It will also remove the user from the database.
 
 ```sh
-./scripts/drop-user.sh {schema_name}
+local-23ai.sh drop-user {schema_name}
 ```
 
 ### Using the VS Code SQL Developer debugger
@@ -170,7 +175,7 @@ You can use the VS Code SQL Developer extension to debug your PL/SQL code. Any c
 This will create a datapump dump of all users. If there is an APEX workspace it will backup both the workspace defintion and the applications in them.
 
 ```sh
-./scripts/backup-all.sh
+local-23ai.sh backup-all
 ```
 
 
@@ -181,12 +186,12 @@ This will create a datapump dump of the database schema. If there is an APEX wor
 The files are written to the `./backups/export` directory.
 
 ```sh
-./scripts/backup-schema.sh {schema_name}
+local-23ai.sh backup-schema {schema_name}
 ```
 
 ### Import Backup
 
-You can currently run `./scripts/import-backup.sh <schema-name>` to import a backup. Currently it does only create the user if it does not exist and import the data pump dump.
+You can currently run `local-23ai.sh import-backup <schema-name>` to import a backup. Currently it does only create the user if it does not exist and import the data pump dump.
 
 In the future I want to add the possibility to import APEX workspaces and applications. Currently I need to future out:
 - What if the workspace already exists?
