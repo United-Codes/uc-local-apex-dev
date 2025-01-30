@@ -1,5 +1,7 @@
 # Containerized APEX Development Environment
 
+[Migration Guide](./docs/migrations/readme.md)
+
 ## What is this?
 
 This set of scripts aims to make developing APEX on your local machine as easy as possible. It is a ready-to-use setup with common tasks automated as bash scripts.
@@ -251,8 +253,6 @@ docker cp --archive ./images local-ords:/opt/oracle/apex/24.1.0/
 
 # if on podman use the podman alternative:
 # podman cp --archive ./images local-ords:/opt/oracle/apex/24.1.0/
-
-docker restart local-ords
 ```
 
 Note that I still get the alert that the images are outdated even though they are not. Check if via this link: [http](http://localhost:8181/i/apex_version.js) / [https](https://localhost:8181/i/apex_version.js).
