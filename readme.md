@@ -69,6 +69,9 @@ Make sure you permission to run the scripts. If you get errors, run the followin
 chmod +x ./local-23ai.sh ./setup.sh ./scripts/*.sh
 ```
 
+> [!IMPORTANT]  
+> Currently ORDS installs APEX 24.1. Follow [this guide](https://github.com/United-Codes/uc-local-apex-dev/blob/25-1/docs/migrations/25-1.md#upgrade-apex-to-242) on how to upgrade to 24.2.
+
 ### Optional: SSL
 
 If you want to use SSL (https) run the following command:
@@ -90,6 +93,8 @@ The containers will use some resources in the background. You can stop them with
 
 ```sh
 docker-compose stop
+# or if you set up the path (see below)
+local-23ai.sh stop
 ```
 
 ## APEX
