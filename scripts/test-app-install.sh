@@ -3,6 +3,7 @@
 set -e
 
 source ./scripts/util/load_env.sh
+source ./scripts/util/user-exists-in-db.sh
 
 if [ -z "$1" ]; then
   echo "Usage: $0 <path to application file>"
@@ -31,35 +32,54 @@ if [[ $FILE_NAME != *.sql ]]; then
 fi
 
 RANDOM_NUMBER=$(shuf -i 0-9 -n 6 | tr -d '\n')
-USER_NAME="TESTINSTALL_$RANDOM_NUMBER"
+USER_NAME="UC_TESTINSTALL_1"
 
-./scripts/create-user.sh $USER_NAME
-
-echo "user created"
+if user_exists_in_db $USER_NAME; then
+  ./scripts/clear-schema.sh $USER_NAME
+else
+  echo "user $USER_NAME does not exist"
+  ./scripts/create-user.sh $USER_NAME
+  echo "user $USER_NAME created"
+fi
 
 USERNAME_LOWER=$(echo $USER_NAME | tr '[:upper:]' '[:lower:]')
 USER_DB_CONN_NAME="${DB_CONN_BASE}-${USERNAME_LOWER}"
 echo "user db conn name: $USER_DB_CONN_NAME"
 
-echo "installing application"
+echo "installing application with ID: $RANDOM_NUMBER"
+echo "..."
 
-sql -name $USER_DB_CONN_NAME <<SQL
+sql -name "$USER_DB_CONN_NAME" <<SQL
 set serveroutput on size unlimited
 
 begin
+  --apex_application_install.generate_application_id;
   apex_application_install.set_workspace( p_workspace => '$USER_NAME' );
   apex_application_install.set_schema( p_schema => '$USER_NAME' );
   apex_application_install.set_application_name( p_application_name => '$USER_NAME' );
   apex_application_install.set_application_alias( p_application_alias => '$RANDOM_NUMBER' );
   apex_application_install.set_application_id( p_application_id => $RANDOM_NUMBER );
+
+  apex_application_install.set_auto_install_sup_obj( p_auto_install_sup_obj => true );
 end;
 /
 
 @${FILE_NAME}
+
+prompt Application installed
+
+prompt user objects:
+SELECT object_type, count(object_name)
+from user_objects
+group by object_type;
+
+prompt Invalid objects:
+SELECT object_type, object_name
+FROM user_objects
+WHERE status = 'INVALID';
+
+
+
 SQL
 
-echo "application installed"
-
-./scripts/drop-user.sh $USER_NAME
-
-echo "user $USER_NAME dropped"
+echo "Done. You can connect to $USER_NAME to inspect the schema"
