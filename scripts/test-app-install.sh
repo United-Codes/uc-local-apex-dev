@@ -53,7 +53,6 @@ sql -name "$USER_DB_CONN_NAME" <<SQL
 set serveroutput on size unlimited
 
 begin
-  --apex_application_install.generate_application_id;
   apex_application_install.set_workspace( p_workspace => '$USER_NAME' );
   apex_application_install.set_schema( p_schema => '$USER_NAME' );
   apex_application_install.set_application_name( p_application_name => '$USER_NAME' );
@@ -65,6 +64,13 @@ end;
 /
 
 @${FILE_NAME}
+
+begin 
+  apex_util.set_security_group_id
+    (p_security_group_id => apex_application_install.get_workspace_id);
+  apex_app_object_dependency.scan( p_application_id => $RANDOM_NUMBER );
+end;
+/
 
 prompt Application installed
 
@@ -78,7 +84,13 @@ SELECT object_type, object_name
 FROM user_objects
 WHERE status = 'INVALID';
 
-
+select application_id
+     , page_id
+     , component_display_name
+     , property_name
+     , code_fragment
+     , error_message 
+  from apex_used_db_object_comp_props where error_message is not null;
 
 SQL
 
