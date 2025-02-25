@@ -70,6 +70,10 @@ chmod +x ./local-23ai.sh ./setup.sh ./scripts/*.sh
 ```
 
 > [!IMPORTANT]  
+> If you are having issues with ORDS saying it can't connect to the database, please downgrade it to 24.3 in the docker-compose.yml. Weirdly, this issue only happens in some cases.
+
+
+> [!IMPORTANT]  
 > Currently ORDS installs APEX 24.1. Follow [this guide](https://github.com/United-Codes/uc-local-apex-dev/blob/25-1/docs/migrations/25-1.md#upgrade-apex-to-242) on how to upgrade to 24.2.
 
 ### Optional: SSL
