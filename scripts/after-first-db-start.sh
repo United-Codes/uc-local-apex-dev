@@ -44,8 +44,8 @@ sql -name $DB_CONN_NAME <<SQL
     -- ACL to allow web service requests
     dbms_network_acl_admin.Append_host_ace(
       host => '*',
-      ace => Xs$ace_type(
-        privilege_list => Xs$name_list('connect')
+      ace => Xs\$ace_type(
+        privilege_list => Xs\$name_list('connect')
       , principal_name => l_username
       , principal_type => xs_acl.ptype_db
       )
