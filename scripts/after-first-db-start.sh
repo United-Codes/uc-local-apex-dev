@@ -19,11 +19,11 @@ WS_SETTINGS=$(get_ws_settings "INTERNAL")
 sql -name $DB_CONN_NAME <<SQL
   select user from dual;
 
-  $WS_SETTINGS
-
   declare
     l_username varchar2(100) ;
   begin
+    $WS_SETTINGS
+
     select creator
       into l_username
       from PUBLICSYN where SNAME = 'APEX_UTIL'
@@ -44,8 +44,8 @@ sql -name $DB_CONN_NAME <<SQL
     -- ACL to allow web service requests
     dbms_network_acl_admin.Append_host_ace(
       host => '*',
-      ace => Xs$ace_type(
-        privilege_list => Xs$name_list('connect')
+      ace => Xs\$ace_type(
+        privilege_list => Xs\$name_list('connect')
       , principal_name => l_username
       , principal_type => xs_acl.ptype_db
       )
