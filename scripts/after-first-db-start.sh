@@ -19,11 +19,11 @@ WS_SETTINGS=$(get_ws_settings "INTERNAL")
 sql -name $DB_CONN_NAME <<SQL
   select user from dual;
 
-  $WS_SETTINGS
-
   declare
     l_username varchar2(100) ;
   begin
+    $WS_SETTINGS
+
     select creator
       into l_username
       from PUBLICSYN where SNAME = 'APEX_UTIL'
