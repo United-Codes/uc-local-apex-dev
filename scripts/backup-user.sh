@@ -78,8 +78,8 @@ sql -name $USER_DB_CONN_NAME <<SQL
     column workspace_id new_value workspace_id
     select workspace_id from apex_workspaces fetch first row only;
 
-    apex export-workspace -woi &workspace_id
-    apex export-all-applications -woi &workspace_id
+    apex export-workspace -woi &workspace_id -overwrite-files
+    apex export-all-applications -woi &workspace_id -overwrite-files
 
     exit;
 SQL
