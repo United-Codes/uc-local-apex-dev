@@ -1,4 +1,4 @@
-#!/bin/zsh
+#!/bin/bash
 PRINT_RED='\033[0;31m'
 PRINT_RESET='\033[0m'
 
