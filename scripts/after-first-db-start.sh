@@ -16,7 +16,7 @@ echo "Configuring INTERNAL workspace settings"
 # get workspace settings (extended session timeout, etc)
 WS_SETTINGS=$(get_ws_settings "INTERNAL")
 
-sql -name $DB_CONN_NAME <<SQL
+sql -name "$DB_CONN_NAME" <<SQL
   select user from dual;
 
   declare
@@ -60,3 +60,11 @@ sql -name $DB_CONN_NAME <<SQL
 SQL
 
 ./scripts/sync-backups-folder.sh
+
+read -r -p "Do you want to disable archive logs (recommended)? [Y/n] " answer
+
+if [[ $answer == "n" ]] || [[ $answer == "N" ]]; then
+  echo "Keeping archive logs enabled"
+else
+  ./scripts/disable-archive-logs.sh
+fi
