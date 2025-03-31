@@ -58,6 +58,12 @@ docker logs --follow local-ords
 #         User:      ADMIN
 #         Password:  Welcome_1
 
+# !IMPORTANT
+# If you see APEX as unavailable at ther landing page (http://localhost:8181/ords/_/landing)
+# and the ords logs show that the config folder is not writable, you need to run the following command:
+# chmod -R 777 ./ords-config
+#
+# then restart the container: docker-compose restart ords
 
 # Run DB config script:
 ./scripts/after-first-db-start.sh
