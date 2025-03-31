@@ -36,6 +36,7 @@ fi
 # create ords-config directory if not exists
 if [ ! -d ./ords-config ]; then
   mkdir ./ords-config
+  chmod 777 ./ords-config
 fi
 
 # write conn_string.txt file with connection string
