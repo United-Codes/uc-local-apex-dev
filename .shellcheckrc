@@ -1,0 +1,3 @@
+shell=bash
+source-path=./scripts
+external-sources=true
