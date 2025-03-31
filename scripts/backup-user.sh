@@ -83,3 +83,5 @@ sql -name $USER_DB_CONN_NAME <<SQL
 
     exit;
 SQL
+
+./scripts/sync-backups-folder.sh
