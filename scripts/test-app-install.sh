@@ -84,6 +84,7 @@ SELECT object_type, object_name
 FROM user_objects
 WHERE status = 'INVALID';
 
+prompt APEX object dependency scan errors:
 select application_id
      , page_id
      , component_display_name
