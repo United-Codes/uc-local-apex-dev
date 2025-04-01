@@ -13,11 +13,20 @@ fi
 # If the input path is relative (doesn't start with /)
 if [[ "${1}" != /* ]]; then
   # Make it absolute using the original working directory
-  echo "path: ${ORIGINAL_PWD}/${1}"
   FILE_NAME=$(realpath "${ORIGINAL_PWD}/${1}")
 else
   FILE_NAME="${1}"
 fi
+
+echo "path: ${FILE_NAME}"
+
+# Create a temporary symbolic link with no spaces
+TEMP_FILE="/tmp/temp_sql_file_$(date +%s).sql"
+ln -sf "${FILE_NAME}" "${TEMP_FILE}"
+echo "Created temporary link: ${TEMP_FILE}"
+
+FILE_NAME="${TEMP_FILE}"
+echo "symbolic link: ${FILE_NAME}"
 
 # check if file exists
 if [ ! -f "$FILE_NAME" ]; then
@@ -63,7 +72,7 @@ begin
 end;
 /
 
-@${FILE_NAME}
+@"${FILE_NAME}"
 
 begin 
   apex_util.set_security_group_id
@@ -94,5 +103,11 @@ select application_id
   from apex_used_db_object_comp_props where error_message is not null;
 
 SQL
+
+# Remove the temporary symbolic link
+if [[ -L "${TEMP_FILE}" ]]; then
+  rm "${TEMP_FILE}"
+  echo "Removed temporary symbolic link: ${TEMP_FILE}"
+fi
 
 echo "Done. You can connect to $USER_NAME to inspect the schema"
