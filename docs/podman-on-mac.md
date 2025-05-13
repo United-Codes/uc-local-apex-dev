@@ -15,7 +15,7 @@ PATH=$(brew --prefix)/Caskroom/sqlcl/$SQLCLPATH/sqlcl/bin:$PATH
 
 [Read this](https://hartenfeller.dev/blog/sqlcl-homebrew-macos) for more information.
 
-If you have no docker runtime yet I recommend doing the following:
+If you have no Docker runtime yet, I recommend doing the following:
 
 ```sh
 brew install podman
@@ -44,9 +44,11 @@ Now test if you can run podman via the docker command:
 docker ps
 ```
 
-If this does not work, please let me know if and how you fixed the issue.
+If this does not work please [follow this guide](https://podman-desktop.io/docs/migrating-from-docker/using-the-docker_host-environment-variable).
 
-Alternatively you can also use `podman` commands like:
+If you have this file `~/.docker/config.json`, delete or rename it if you see this error: `error getting credentials - err: exec: "docker-credential-desktop": executable file not found in $PATH`.
+
+Alternatively, you can try using `podman` commands like:
 
 ```sh
 podman-compose up -d
@@ -54,3 +56,4 @@ podman-compose stop
 podman ps
 # etc
 ```
+But podman-compose can cause some trouble in my experience.
