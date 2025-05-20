@@ -101,7 +101,13 @@ sql -name $DB_CONN_NAME <<SQL
   grant create mle to ${USERNAME};
   grant create property graph to ${USERNAME};
   grant execute dynamic mle to ${USERNAME};
+
   grant execute on dbms_crypto to ${USERNAME};
+  grant execute on dbms_lock   to ${USERNAME};
+  grant execute on dbms_lob    to ${USERNAME};
+  grant execute on dbms_xmlgen to ${USERNAME};
+  grant execute on dbms_sql    to ${USERNAME};
+  grant execute on dbms_random to ${USERNAME};
 
   grant debug connect session to ${USERNAME};
   grant debug connect any to ${USERNAME};
