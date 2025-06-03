@@ -20,21 +20,21 @@ services:
 
   ords:
     ports:
-      - 8181:8181
+      - 8181:8080
     volumes:
-      - type: bind
-        source: ords-secrets
-        target: /opt/oracle/variables
       - type: bind
         source: ords-config
         target: /etc/ords/config
+      - type: bind
+        source: apex-images
+        target: /opt/oracle/apex/images
     restart: no
     env_file:
-      - ./.env.ords
+      - ./.env
     depends_on:
       23ai:
         condition: service_healthy
-    image: container-registry.oracle.com/database/ords-developer:24.4.0
+    image: container-registry.oracle.com/database/ords:25.1.0
     container_name: local-ords
 
 networks:

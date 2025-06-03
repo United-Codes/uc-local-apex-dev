@@ -20,18 +20,13 @@ echo "ORACLE_PWD=\"$SYS_PASSWORD\"" >>.env
 echo "DB_CONN_BASE=local-23ai" >>.env
 echo "DB_CONN_NAME=local-23ai-sys" >>.env
 echo "CONTAINER_NAME=local-23ai" >>.env
+echo "DBSERVICENAME=\"FREEPDB1\"" >>.env
+echo "DBHOST=\"23ai\"" >>.env
+echo "DBPORT=\"1521\"" >>.env
+echo "FORCE_SECURE=\"false\"" >>.env
+echo "DEBUG=\"true\"" >>.env
 
-echo "Password written to .env file"
-
-# create ords-secrets directory if not exists
-if [ ! -d ./ords-secrets ]; then
-  mkdir ./ords-secrets
-fi
-
-# remove conn_string.txt if exists
-if [ -f ./ords-secrets/conn_string.txt ]; then
-  rm ./ords-secrets/conn_string.txt
-fi
+echo "Created .env file"
 
 # create ords-config directory if not exists
 if [ ! -d ./ords-config ]; then
@@ -39,12 +34,5 @@ if [ ! -d ./ords-config ]; then
   chmod 777 ./ords-config
 fi
 
-# write conn_string.txt file with connection string
-echo "CONN_STRING=sys/$SYS_PASSWORD@23ai:1521/FREEPDB1" >./ords-secrets/conn_string.txt
-
-echo "credentails created"
-
 mkdir -p ./backups/export
 mkdir -p ./backups/import
-
-echo "IGNORE_APEX=FALSE" >.env.ords
