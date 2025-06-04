@@ -1,0 +1,87 @@
+---
+title: Common Tasks
+description: Learn how to perform common development tasks with UC Local APEX Dev
+sidebar:
+  order: 2
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+Once your environment is set up, these are the most common tasks you'll perform during APEX development.
+
+## Managing Containers
+
+### Start/Stop Containers
+
+```bash
+# Stop database
+local-23ai.sh stop
+# You could also run this, but the script will gracefully stop the database
+# docker-compose stop
+
+local-23ai.sh start
+# Or
+# docker-compose start
+```
+
+## ORDS Configuration
+
+### Modify ORDS Settings
+
+The `ords-config` folder in the root directory contains ORDS configuration files. Modify these files and restart the ORDS container to apply changes:
+
+```bash
+# After modifying config files
+docker-compose restart ords
+```
+
+### SSL Configuration
+
+Enable HTTPS for ORDS by creating self-signed certificates. On MacOS and Linux it will also add the certificate to your system's keychain:
+
+```bash
+sudo ./scripts/create-self-signed-certificates.sh
+docker-compose restart ords
+```
+
+Access via: https://localhost:8181/ords/\_/landing
+
+## Maintenance Tasks
+
+### Check Database Space Usage
+
+Keep in mind that the FREE database has a space limitation of 12GB. You can check the used space with:
+
+```bash
+local-23ai.sh used-space
+```
+
+### Shrink Database Files
+
+If your tablespaces have grown over it's actually used space, you can shrink them to reclaim space. This can take a while.
+
+```bash
+local-23ai.sh shrink-space
+```
+
+### Disable Archive Logs
+
+For development environments, you might want to disable archive logging. You will be asked if you want to do this in the `after-first-db-start.sh` script, but you can also run it manually:
+
+```bash
+./scripts/disable-archive-logs.sh
+```
+
+## Complete Environment Reset
+
+### Delete All Data
+
+To start completely fresh (⚠️ **ALL DATA WILL BE LOST**):
+
+```bash
+docker-compose down
+docker volume rm oradata
+rm .env
+```
+
+Then follow the [setup instructions](/getting-started/) again.

@@ -1,0 +1,38 @@
+image: oven/bun:1
+
+stages:
+  - build
+  - deploy
+
+build:
+  stage: build
+  only:
+    - docs
+  script:
+    - echo "Building the app"
+    - sh ./docs/build-static-website.sh
+    - mkdir -p $CI_PROJECT_DIR/public/
+    - cp -r ./docs/dist/* $CI_PROJECT_DIR/public/
+  artifacts:
+    paths:
+      - public
+    expire_in: 1 week
+    when: always
+
+pages:
+  stage: deploy
+  only:
+    - docs
+  before_script:
+    - apt-get update && apt-get install -y zip
+  script:
+    - echo "Deploying the app"
+    - zip -r ./ape-docs.zip public/*
+    - mv ape-docs.zip public/
+  artifacts:
+    paths:
+      - public
+    expire_in: 1 week
+    when: always
+  needs:
+    - build

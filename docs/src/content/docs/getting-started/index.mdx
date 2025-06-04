@@ -1,0 +1,152 @@
+---
+title: Getting Started
+description: Quick setup guide for UC Local APEX Dev environment
+sidebar:
+  order: 1
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+Get your Oracle 23ai database with APEX and ORDS running locally in just a few minutes. This guide will walk you through the complete setup process.
+
+## Prerequisites
+
+Before you begin, make sure you have the following installed:
+
+### Required Software
+
+- **Docker or Podman** (or any docker-compatible container runtime)
+- **docker-compose / podman-compose**
+- **SQLcl** with "sql" command in PATH
+- **Bash-compatible shell**
+
+<Aside type="caution" title="Resource Requirements">
+Make sure your virtual machine has enough resources allocated. **The default Podman VM will cause issues with Oracle**.
+
+Recommended minimum:
+
+- **4GB RAM**
+- **3 CPUs**
+- **20GB disk space**
+
+[Learn more about Oracle container requirements](https://hartenfeller.dev/blog/oracle-23ai-container-wont-start-mac)
+
+</Aside>
+
+### Platform-Specific Notes
+
+#### macOS Users
+
+If you're using macOS, [read the Podman setup guide](/other/podman-on-mac) for additional configuration steps.
+
+#### Windows Users
+
+We recommend using WSL2 (Windows Subsystem for Linux) for the best experience.
+
+## Quick Setup
+
+### 1. Clone the Repository
+
+```bash
+git clone https://github.com/United-Codes/uc-local-apex-dev.git
+cd uc-local-apex-dev
+```
+
+### 2. Make Scripts Executable
+
+```bash
+chmod +x ./local-23ai.sh ./setup.sh ./scripts/*.sh
+```
+
+### 3. Run Setup
+
+```bash
+# Setup the environment
+./setup.sh
+
+# Start the containers (use podman-compose if using Podman)
+docker-compose up -d
+```
+
+### 4. Wait for APEX Installation
+
+Monitor the ORDS container logs to see the installation progress:
+
+```bash
+docker logs --follow local-ords
+```
+
+Wait for these key messages:
+
+- `INFO : Database connection established.`
+- `INFO : Installing APEX on your DB please be patient.`
+- `INFO : APEX has been installed.`
+- `INFO : APEX ADMIN password has configured as 'Welcome_1'.`
+
+<Aside type="tip" title="Installation Complete">
+  You'll see login credentials displayed: - **Workspace**: internal - **User**:
+  ADMIN - **Password**: Welcome_1
+</Aside>
+
+### 5. Configure Database
+
+After APEX installation completes, run the post-installation script:
+
+```bash
+./scripts/after-first-db-start.sh
+```
+
+Optionally [set up local SSL/HTTPS](/getting-started/common-tasks/#ssl-configuration) for ORDS.
+
+### 6. PATH Configuration
+
+For easier script access, add the repository to your PATH:
+
+```bash
+# Add to ~/.zshrc or ~/.bashrc
+export PATH="/Users/username/path/to/uc-local-apex-dev:$PATH"
+```
+
+Then use scripts from anywhere:
+
+```bash
+local-23ai.sh create-user newproject
+local-23ai.sh backup-all
+local-23ai.sh stop
+```
+
+<Aside type="tip" title="Script Help">
+  Run `local-23ai.sh --help` to see all available commands and options.
+</Aside>
+
+## Next Steps
+
+Now that your environment is running:
+
+1. **Create your first workspace**: `local-23ai.sh create-user myproject`
+2. **Explore the available scripts**: `local-23ai.sh --help`
+3. **Start developing your APEX applications**
+
+## Troubleshooting
+
+### ORDS Config Folder Not Writable
+
+If you see APEX as unavailable and the ORDS logs show that the config folder is not writable:
+
+```bash
+chmod -R 777 ./ords-config
+docker-compose restart ords
+```
+
+## Access Your Environment
+
+Once setup is complete, you can access:
+
+- **APEX**: http://localhost:8181/ords/apex
+- **ORDS Landing**: http://localhost:8181/ords/\_/landing
+- **Database**: ai:1521 (Service: FREEPDB1)
+
+### Default APEX Credentials
+
+- **Username**: admin or ADMIN
+- **Password**: Welcome_1

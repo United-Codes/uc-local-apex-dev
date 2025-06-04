@@ -1,0 +1,70 @@
+---
+title: Introduction
+description: Containerized APEX development environment - Have a 23ai with APEX and ORDS running in minutes
+sidebar:
+  order: 10
+template: doc
+hero:
+  tagline: Have a 23ai with APEX and ORDS running in a few minutes. A containerized development environment that makes Oracle APEX development on your local machine as easy as possible.
+  actions:
+    - text: Get Started
+      link: /getting-started/
+      icon: right-arrow
+    - text: View on GitHub
+      link: https://github.com/United-Codes/uc-local-apex-dev
+      icon: external
+      variant: minimal
+---
+
+uc-local-apex-dev is a ready-to-use containerized development environment that automates common Oracle APEX development tasks. Get a complete Oracle 23ai database with APEX and ORDS running locally with optimal settings and convenient bash scripts for common operations.
+
+## Key Features
+
+import { Card, CardGrid } from "@astrojs/starlight/components";
+
+<CardGrid>
+  <Card title="Quick Setup" icon="rocket">
+    Get Oracle 23ai with APEX and ORDS running in just a few minutes with
+    automated setup scripts.
+  </Card>
+  <Card title="Oracle 23ai" icon="seti:db">
+    Run the latest Oracle Database 23ai with all features enabled.
+  </Card>
+  <Card title="User & Workspace Management" icon="add-document">
+    Create users and workspaces with optimal settings using a single command.
+    All users are stored in SQLcl and VS Code for easy access.
+  </Card>
+  <Card title="Backup & Restore" icon="cloud-download">
+    Easily backup and restore your data, workspaces, and applications with
+    built-in datapump integration.
+  </Card>
+  <Card title="Development Tools" icon="seti:config">
+    Built-in support for SQLcl, VS Code SQL Developer, and PL/SQL debugging.
+  </Card>
+  <Card title="Testing Environment" icon="approve-check">
+    Test APEX application installs and install scripts with automated validation
+    and dependency scanning.
+  </Card>
+</CardGrid>
+
+## Perfect for APEX Developers
+
+This environment is specifically designed for Oracle APEX developers who want to:
+
+- **Develop Locally**: Work on APEX applications without needing a remote database
+- **Test Repeatedly**: Clear schemas and test installation scripts multiple times
+- **Debug Efficiently**: Use VS Code SQL Developer debugger with proper grants
+- **Manage Workspaces**: Create and manage multiple development workspaces easily
+- **Backup Regularly**: Protect your work with automated backup solutions
+
+## What's Included
+
+- **Oracle Database 23ai**: Latest Oracle database with all features
+- **Oracle APEX 24.2+**: Full APEX installation with admin access
+- **Oracle ORDS**: REST Data Services for APEX connectivity
+- **Automated Scripts**: Bash scripts for common development tasks
+- **Development Grants**: All necessary permissions for debugging and development
+
+## Important Note
+
+⚠️ **This is not for production use!** The environment is configured to be unsecure to make development as easy as possible. Use at your own risk and run backups regularly.

@@ -1,4 +1,11 @@
-# Init podman on MacOS
+---
+title: Init podman on MacOS
+description: Getting started with Podman on macOS for Oracle 23ai development
+sidebar:
+    order: 10
+---
+
+## Prerequisites
 
 You need the [homebrew](https://brew.sh/) package manager for this:
 
@@ -14,6 +21,8 @@ PATH=$(brew --prefix)/Caskroom/sqlcl/$SQLCLPATH/sqlcl/bin:$PATH
 ```
 
 [Read this](https://hartenfeller.dev/blog/sqlcl-homebrew-macos) for more information.
+
+## Installing Podman
 
 If you have no Docker runtime yet, I recommend doing the following:
 
@@ -44,6 +53,8 @@ Now test if you can run podman via the docker command:
 docker ps
 ```
 
+## Troubleshooting
+
 If this does not work please [follow this guide](https://podman-desktop.io/docs/migrating-from-docker/using-the-docker_host-environment-variable).
 
 If you have this file `~/.docker/config.json`, delete or rename it if you see this error: `error getting credentials - err: exec: "docker-credential-desktop": executable file not found in $PATH`.
@@ -57,3 +68,23 @@ podman ps
 # etc
 ```
 But podman-compose can cause some trouble in my experience.
+
+## After a restart
+
+After a restart of your Mac, you need to start the Podman machine again:
+
+```sh
+podman machine start
+```
+
+Equally you can stop it with:
+
+```sh
+podman machine stop
+```
+
+But I recomment stopping the database before stopping the Podman machine:
+
+```sh
+local-23ai.sh stop
+```
