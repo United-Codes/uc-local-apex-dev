@@ -44,9 +44,11 @@ deploy_to_production:
   only:
     - docs
   script:
-    - echo "Deploying on webserver"
-    - unzip deploy/apex-local-docs.zip -d /var/www/united-codes/products/uc-local-apex-dev/docs/
-    - chmod -R 755 /var/www/united-codes/products/uc-local-apex-dev/docs/
+  - echo "Deploying on webserver"
+  - unzip -o deploy/apex-local-docs.zip -d /var/www/united-codes/products/uc-local-apex-dev/docs/
+  - sudo chown -R gitlab-deploy:gitlab-deploy /var/www/united-codes/products/uc-local-apex-dev/docs/
+  - sudo find /var/www/united-codes/products/uc-local-apex-dev/docs/ -type d -exec chmod 755 {} \;
+  - sudo find /var/www/united-codes/products/uc-local-apex-dev/docs/ -type f -exec chmod 644 {} \;
   environment:
     name: production_webserver
     url: https://www.united-codes.com/products/uc-local-apex-dev/docs/
