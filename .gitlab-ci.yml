@@ -2,6 +2,7 @@ image: oven/bun:1
 
 stages:
   - build
+  - package
   - deploy
 
 build:
@@ -15,24 +16,39 @@ build:
     - cp -r ./docs/dist/* $CI_PROJECT_DIR/public/
   artifacts:
     paths:
-      - public
+      - public/
     expire_in: 1 week
-    when: always
 
-pages:
-  stage: deploy
+package:
+  stage: package
   only:
     - docs
+  image: debian:bullseye
   before_script:
     - apt-get update && apt-get install -y zip
   script:
-    - echo "Deploying the app"
-    - zip -r ./ape-docs.zip public/*
-    - mv ape-docs.zip public/
+    - zip -r apex-local-docs.zip public/
+    - mkdir -p deploy
+    - mv apex-local-docs.zip deploy/
   artifacts:
     paths:
-      - public
+      - deploy/apex-local-docs.zip
     expire_in: 1 week
-    when: always
   needs:
     - build
+
+deploy_to_production:
+  stage: deploy
+  tags:
+    - prod_web
+  only:
+    - docs
+  script:
+    - echo "Deploying on webserver"
+    - unzip deploy/apex-local-docs.zip -d /var/www/united-codes/products/uc-local-apex-dev/docs/
+    - chmod -R 755 /var/www/united-codes/products/uc-local-apex-dev/docs/
+  environment:
+    name: production_webserver
+    url: https://www.united-codes.com/products/uc-local-apex-dev/docs/
+  needs:
+    - package
