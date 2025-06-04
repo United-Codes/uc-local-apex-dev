@@ -27,9 +27,11 @@ package:
   before_script:
     - apt-get update && apt-get install -y zip
   script:
-    - cd public && zip -r ../apex-local-docs.zip ./*
-    - mkdir -p deploy
-    - mv apex-local-docs.zip deploy/
+  - cd public
+  - zip -r ../apex-local-docs.zip ./*
+  - cd ..
+  - mkdir -p deploy
+  - mv apex-local-docs.zip deploy/
   artifacts:
     paths:
       - deploy/apex-local-docs.zip
