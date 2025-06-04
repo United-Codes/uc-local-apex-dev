@@ -7,6 +7,7 @@ import starlightLinksValidator from 'starlight-links-validator';
 // https://astro.build/config
 export default defineConfig({
 	site: 'https://united-codes.com/products/uc-local-apex-dev/docs',
+	base: '/products/uc-local-apex-dev/docs',
 	integrations: [
 		starlight({
 			title: 'uc-local-apex-dev',
