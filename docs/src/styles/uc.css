@@ -30,9 +30,8 @@
 
 html[data-theme="dark"] {
 	& .site-title > img {
-		background-color: white;
-		border-radius: 12px;
-		padding: 0 0.25rem;
+		/* make the logo white in dark mode */
+		filter: saturate(0) invert(1);
 	}
 }
 
@@ -44,7 +43,6 @@ html[data-theme="dark"] {
 	& img {
 		max-width: 195px;
 		margin-bottom: -3px;
-		
 	}
 
 	& span { 
