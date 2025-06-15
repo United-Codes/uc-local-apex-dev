@@ -241,45 +241,6 @@ rm .env
 If you follow the [setup](#setup) instructions again, you will have a fresh database.
 
 
-## FAQ
-
-### Can I modify ORDS settings?
-
-Yes. A folder named `ords-config` will be created in the root directory. You can modify the config files there. The changes will be applied on the next restart of the ORDS container.
-
-### How can I upgrade the database version?
-
-This is a bit tricky. In the past datafiles were not compatible between versions. This is the reason I added the backup scripts. For the future I want to add a script that will then import everything again.
-
-### How can I ugprade ORDS?
-
-You can modify the `docker-compose.yml` file to use a different ORDS version. You can find the available versions [in the Oracle container registry](https://container-registry.oracle.com/ords/f?p=113).
-
-I will also update the github repository with the latest version of ORDS.
-
-### How can I patch APEX?
-
-- You need a valid Oracle support account
-- Go to the [APEX Downloads Page](https://www.oracle.com/tools/downloads/apex-downloads/)
-- Click on Patch Set Bundle
-- Login with your Oracle account and download the zip file
-- Unzip the file
-- Start a terminal in the directory
-- Run the following command:
-
-```sh
-sql -name local-23ai-sys @catpatch.sql
-```
-
-To update the APEX images (assets):
-
-```sh
-# make sure you are in the directory of the unzipped patch directory
-
-cp ./images {path_to_your_cloned_repo}/apex-images
-```
-
-Note that I still get the alert that the images are outdated even though they are not. Check if via this link: [http](http://localhost:8181/i/apex_version.js) / [https](https://localhost:8181/i/apex_version.js).
 
 ## Contributing
 
