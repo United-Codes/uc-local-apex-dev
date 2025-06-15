@@ -41,6 +41,12 @@ sql -name "$DB_CONN_NAME" <<SQL
     !';
     commit;
 
+    execute IMMEDIATE ' update ' || l_username || q'!.wwv_flow_platform_prefs
+        set VALUE = 10000
+      where NAME = 'ACCOUNT_LIFETIME_DAYS'
+    !';
+    commit;
+
     -- ACL to allow web service requests
     dbms_network_acl_admin.Append_host_ace(
       host => '*',
