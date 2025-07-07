@@ -11,6 +11,30 @@ source ./scripts/util/get_ws_settings.sh
 # setup datapump directories
 ./scripts/util/create-datapump-directory.sh
 
+echo "Downloading APEX"
+
+rm -rf ./apex || true
+rm -rf ./apex-images || true
+
+wget https://download.oracle.com/otn_software/apex/apex-latest.zip
+unzip apex-latest.zip
+rm apex-latest.zip
+rm -rf ./META-INF || true
+
+echo "Installing APEX"
+
+cd ./apex || exit 1
+ 
+sql -name "$DB_CONN_NAME" <<SQL
+@apexins.sql SYSAUX SYSAUX TEMP /i/
+exit;
+SQL
+
+cd ..
+
+echo "Configure APEX images"
+cp -r ./apex/images/ ./apex-images/
+
 echo "Configuring INTERNAL workspace settings"
 
 # get workspace settings (extended session timeout, etc)

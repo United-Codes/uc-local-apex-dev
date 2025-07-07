@@ -68,29 +68,23 @@ chmod +x ./local-23ai.sh ./setup.sh ./scripts/*.sh
 docker-compose up -d
 ```
 
-### 4. Wait for APEX Installation
+### 4. Wait until DB and ORDS are ready
 
-Monitor the ORDS container logs to see the installation progress:
+First wait untull the docker containers are running:
 
 ```bash
-docker logs --follow local-ords
+docker-compose up -d
+[+] Running 4/4
+ ✔ Network docker-apex-24-1_default  Created
+ ✔ Volume "oradata"                  Created
+ ✔ Container local-23ai              Healthy
+ ✔ Container local-ords              Started
 ```
 
-Wait for these key messages:
+Wait till http://localhost:8181/ords loads successfully in your browser. You should see the ORDS landing page.
+This can take 1 to 2 minutes depending on your system performance. You can follow the logs via `docker-compose logs --follow`.
 
-- `INFO : Database connection established.`
-- `INFO : Installing APEX on your DB please be patient.`
-- `INFO : APEX has been installed.`
-- `INFO : APEX ADMIN password has configured as 'Welcome_1'.`
-
-<Aside type="tip" title="Installation Complete">
-  You'll see login credentials displayed: - **Workspace**: internal - **User**:
-  ADMIN - **Password**: Welcome_1
-</Aside>
-
-### 5. Configure Database
-
-After APEX installation completes, run the post-installation script:
+### 5. Install APEX and confiure DB
 
 ```bash
 ./scripts/after-first-db-start.sh
@@ -98,7 +92,60 @@ After APEX installation completes, run the post-installation script:
 
 Optionally [set up local SSL/HTTPS](/products/uc-local-apex-dev/docs/getting-started/common-tasks/#ssl-configuration) for ORDS.
 
-### 6. PATH Configuration
+If you want to save diskspace you can remove the `apex` directory:
+
+```bash
+rm -rf ./apex
+```
+
+### 6. Restart ORDS
+
+```bash
+docker-compose restart ords
+```
+
+If you wait until http://localhost:8181/ords loads successfully, you should now see the APEX module loaded.
+Click go or go to http://localhost:8181/ords/apex to login.
+
+If you get an error messsage saying "Account Is Locked" do the following:
+
+```bash
+sql -name local-23ai-sys
+```
+
+Check which accounts are locked:
+
+```sql
+select username, account_status
+  from dba_users
+ where (username like 'APEX%' or username like 'ORDS%')
+   and not regexp_like(username, 'APEX_[0-9]+');
+```
+
+For any locked accounts, run (change c_username value):
+
+```sql
+DECLARE
+  c_username CONSTANT VARCHAR2(128) := 'APEX_PUBLIC_USER';
+  l_unexpire_command VARCHAR2(4000);
+BEGIN
+  EXECUTE IMMEDIATE 'ALTER USER ' || c_username || ' ACCOUNT UNLOCK';
+
+  SELECT 'alter user ' || name || q'< identified by values '>' || spare4 || ';' || password || q'<'>'
+    INTO l_unexpire_command
+    FROM sys.user$
+   WHERE name = c_username;
+
+  EXECUTE IMMEDIATE l_unexpire_command;
+END;
+/
+```
+
+If you re-run the query, you should see that the account is now unlocked. Exit the sql shell with `exit;`.
+
+You can now reload the APEX page at http://localhost:8181/ords/apex and should see no more error messages.
+
+### 7. PATH Configuration
 
 For easier script access, add the repository to your PATH:
 
@@ -127,17 +174,6 @@ Now that your environment is running:
 2. **Explore the available scripts**: `local-23ai.sh --help`
 3. **Start developing your APEX applications**
 
-## Troubleshooting
-
-### ORDS Config Folder Not Writable
-
-If you see APEX as unavailable and the ORDS logs show that the config folder is not writable:
-
-```bash
-chmod -R 777 ./ords-config
-docker-compose restart ords
-```
-
 ## Access Your Environment
 
 Once setup is complete, you can access:
@@ -148,5 +184,5 @@ Once setup is complete, you can access:
 
 ### Default APEX Credentials
 
-- **Username**: admin or ADMIN
+- **Username**: admin or the schema/workspace name you created
 - **Password**: Welcome_1
