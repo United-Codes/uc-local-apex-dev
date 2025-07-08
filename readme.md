@@ -16,6 +16,8 @@ This set of scripts aims to make developing APEX on your local machine as easy a
 
 **This is not for production use!** The environment is configured to be unsecure to make development as easy as possible.
 
+[Installation Guide](https://www.united-codes.com/products/uc-local-apex-dev/docs/getting-started/)
+
 ## Documentation
 
 For complete setup instructions, configuration guides, and usage examples, visit our documentation site:
@@ -41,7 +43,7 @@ I am especially thankful for improvements to the bash scripts.
 - Tim Hall for the [drop_all.sql](https://oracle-base.com/dba/script?category=miscellaneous&file=drop_all.sql) script
 - Philipp Salvisberg for [helping me to figure out how to use the debugger](https://gist.github.com/PhilippSalvisberg/2f2853bc7a95fa86d9de9c0deab10602)
 - Scott Spendolini for his blog post on [how to add self-signed certificates to ORDS](https://spendolini.blog/adding-ssl-to-your-ords-container)
-- Matt Mulvaney for his blog post on [expiring ORDS accounts](https://mattmulvaney.hashnode.dev/unexpiring-the-ordspublicuser-user-for-apex)
+- Matt Mulvaney for his blog post on [unexpiring ORDS accounts](https://mattmulvaney.hashnode.dev/unexpiring-the-ordspublicuser-user-for-apex)
 - The database team for providing an ARM image for the Oracle database
 - The ORDS team for providing an ARM image for ORDS
 
