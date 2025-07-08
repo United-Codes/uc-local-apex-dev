@@ -17,13 +17,14 @@ Yes. A folder named `ords-config` will be created in the root directory. You can
 
 ## How can I upgrade the database version?
 
-This is a bit tricky. In the past datafiles were not compatible between versions. This is the reason I added the backup scripts. For the future I want to add a script that will then import everything again.
+We will release new versions of the project with migration guides when new ORDS or database versions are available. So make sure to keep an eye on the [GitHub repository](https://github.com/United-Codes/uc-local-apex-dev) for updates.
 
 ## How can I ugprade ORDS?
 
-You can modify the `docker-compose.yml` file to use a different ORDS version. You can find the available versions [in the Oracle container registry](https://container-registry.oracle.com/ords/ocr/ba/database/ords ).
+These will also be covered in the migration guides.
 
-I will also update the github repository with the latest version of ORDS.
+If you are experienced and don't want to wait you can modify the `docker-compose.yml` file to use a different ORDS version. You can find the available versions [in the Oracle container registry](https://container-registry.oracle.com/ords/ocr/ba/database/ords ).
+
 
 ## How can I patch APEX?
 
