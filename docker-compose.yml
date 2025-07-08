@@ -21,6 +21,7 @@ services:
   ords:
     ports:
       - 8181:8080
+      - 8443:8443
     volumes:
       - type: bind
         source: ords-config
