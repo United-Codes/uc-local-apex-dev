@@ -44,7 +44,7 @@ sudo ./scripts/create-self-signed-certificates.sh
 docker-compose restart ords
 ```
 
-Access via: https://localhost:8181/ords/\_/landing
+Access via: https://localhost:8443/ords (Port 8443 instead of 8181).
 
 ## Maintenance Tasks
 
@@ -54,6 +54,20 @@ Keep in mind that the FREE database has a space limitation of 12GB. You can chec
 
 ```bash
 local-23ai.sh used-space
+
+#    CURRENT_GB    LIMIT_GB    PERCENT_OF_LIMIT STATUS
+# _____________ ___________ ___________________ _________
+#          5.04          12               41.97 OK
+
+
+# Tablespace                 Total MB    Used MB    Free MB    Pct. Free
+# _______________________ ___________ __________ __________ ____________
+# SYSAUX                         3440       3158        282            8
+# SYSTEM                          690        679         11            2
+# USERS                           118         59         59           50
+# TBS_PLUGINS                     112         38         74           66
+# UNDOTBS1                        103         23         80           78
+# TBS_AOP                          77          7         70           91
 ```
 
 ### Shrink Database Files

@@ -1,0 +1,35 @@
+---
+title: Upgrade APEX
+description: Guide on how to upgrade any APEX version in the containerized UC Local APEX Dev
+sidebar:
+  order: 1
+---
+
+You don't depend on any changes to this project to upgrade APEX. As soon as an update is available, you can follow these steps to upgrade APEX in your local environment.
+
+## Download and unzip latest APEX version
+
+```sh
+wget https://download.oracle.com/otn_software/apex/apex-latest.zip
+unzip apex-latest.zip
+rm apex-latest.zip
+rm -rf ./META-INF || true
+```
+
+## Perform the upgrade
+
+```sh
+cd apex
+sql -name local-23ai-sys @apexins.sql SYSAUX SYSAUX TEMP /i/
+exit;
+```
+
+## Update the images
+
+```sh
+cd ..
+rm -rf ./apex-images || true
+cp -r ./apex/images ./apex-images
+```
+
+If you get an popup error saying your files our outdated, you need to clear your browser cache.

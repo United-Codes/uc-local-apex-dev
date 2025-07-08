@@ -21,6 +21,7 @@ services:
   ords:
     ports:
       - 8181:8080
+      - 8443:8443
     volumes:
       - type: bind
         source: ords-config
@@ -34,7 +35,7 @@ services:
     depends_on:
       23ai:
         condition: service_healthy
-    image: container-registry.oracle.com/database/ords:25.1.1
+    image: container-registry.oracle.com/database/ords:25.2.0
     container_name: local-ords
 
 networks:
