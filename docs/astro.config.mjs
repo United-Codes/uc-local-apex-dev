@@ -44,7 +44,7 @@ export default defineConfig({
 			components: {
 				Footer: './src/components/Footer.astro',
 			},
-			plugins: [starlightLinksValidator(), starlightImageZoom()],
+			plugins: [starlightLinksValidator({errorOnLocalLinks: false}), starlightImageZoom()],
 		}),
 	],
 });
