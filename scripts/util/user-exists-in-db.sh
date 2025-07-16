@@ -7,8 +7,9 @@ user_exists_in_db() {
   fi
 
   local USERNAME=$1
-  local count=$(
-    sql -S -name $DB_CONN_NAME <<SQL
+  local count
+  count=$(
+    sql -S -name "$DB_CONN_NAME" <<SQL
 SET HEADING OFF
 SET FEEDBACK OFF
 SET PAGESIZE 0

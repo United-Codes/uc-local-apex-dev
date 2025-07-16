@@ -24,7 +24,6 @@ echo "DBSERVICENAME=\"FREEPDB1\"" >>.env
 echo "DBHOST=\"23ai\"" >>.env
 echo "DBPORT=\"1521\"" >>.env
 echo "FORCE_SECURE=\"false\"" >>.env
-echo "DEBUG=\"true\"" >>.env
 
 echo "Created .env file"
 

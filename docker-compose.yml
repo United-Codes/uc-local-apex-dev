@@ -32,6 +32,8 @@ services:
     restart: no
     env_file:
       - ./.env
+    environment:
+      - DEBUG=true
     depends_on:
       23ai:
         condition: service_healthy
