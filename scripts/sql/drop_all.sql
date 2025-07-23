@@ -7,21 +7,31 @@
 -- Notes        : Loops a maximum of 5 times, allowing for failed drops due to dependencies.
 --                Quits outer loop if no drops were atempted.
 -- -----------------------------------------------------------------------------------
+
+-- Modified by: Philipp Hartenfeller
 SET SERVEROUTPUT ON
 DECLARE
+  i          NUMBER := 0;
   l_count    NUMBER;
-  l_cascade  VARCHAR2(20);
+  l_cascade  VARCHAR2(20 char);
 BEGIN
-  << dependency_failure_loop >>
-  FOR i IN 1 .. 5 LOOP
-    EXIT dependency_failure_loop WHEN l_count = 0;
+  <<delete_iterations>>
+  LOOP
+    i := i + 1;
     l_count := 0;
     
+    <<objects>>
     FOR cur_rec IN (SELECT object_name, object_type 
                     FROM   user_objects) LOOP
       BEGIN
         l_count := l_count + 1;
         l_cascade := NULL;
+
+        IF cur_rec.object_type = 'JOB' THEN
+          EXECUTE IMMEDIATE 'BEGIN sys.DBMS_SCHEDULER.DROP_JOB(''' || cur_rec.object_name || ''', TRUE); END;';
+          CONTINUE;
+        END IF;
+
         IF cur_rec.object_type = 'TABLE' THEN
           l_cascade := ' CASCADE CONSTRAINTS';
         END IF;
@@ -30,10 +40,11 @@ BEGIN
         WHEN OTHERS THEN
           NULL;
       END;
-    END LOOP;
+    END LOOP objects;
     -- Comment out the following line if you are pre-10g, or want to preserve the recyclebin contents. 
     EXECUTE IMMEDIATE 'PURGE RECYCLEBIN';
-    DBMS_OUTPUT.put_line('Pass: ' || i || '  Drops: ' || l_count);
-  END LOOP;
+    sys.DBMS_OUTPUT.put_line('Pass: ' || i || '  Drops: ' || l_count);
+    EXIT delete_iterations WHEN l_count = 0 OR i >= 30;
+  END LOOP delete_iterations;
 END;
 /
