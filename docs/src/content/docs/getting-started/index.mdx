@@ -81,6 +81,13 @@ docker-compose up -d
  ✔ Container local-ords              Started
 ```
 
+Then run this command to change the ORDS to use the proxied PL/SQL gateway mode:
+
+```sh
+docker exec -it local-ords bash -c \
+"ords --config /etc/ords/config config --db-pool default set plsql.gateway.mode proxied"
+```
+
 Wait till http://localhost:8181/ords loads successfully in your browser. You should see the ORDS landing page.
 This can take 1 to 2 minutes depending on your system performance. You can follow the logs via `docker-compose logs --follow`.
 
