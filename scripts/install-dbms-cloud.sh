@@ -89,7 +89,7 @@ begin
   );
 
   dbms_network_acl_admin.append_wallet_ace(
-        wallet_path => 'file:/opt/oracle/oradata/wallets/ssl/',
+        wallet_path => 'file:/opt/oracle/oradata/wallets/ssl',
         ace => xs\$ace_type(
             privilege_list =>xs\$name_list('use_client_certificates', 'use_passwords'),
             principal_name => 'C##CLOUD\$SERVICE',
@@ -98,7 +98,7 @@ begin
 end;
 /
 
-alter database property set ssl_wallet='file:/opt/oracle/oradata/wallets/ssl/'
+alter database property set ssl_wallet='file:/opt/oracle/oradata/wallets/ssl'
 
 
 exit
