@@ -11,3 +11,4 @@ ords-secrets
 apex/**/*
 META-INF/**/*
 apex-images
+install_*.log
