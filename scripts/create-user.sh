@@ -21,6 +21,12 @@ if [ -z "$1" ]; then
   exit 1
 fi
 USERNAME=$1
+
+# check if username contains hyphen
+if [[ "$USERNAME" == *"-"* ]]; then
+  echo "Error: Username cannot contain hyphens (-). Oracle identifiers do not support hyphens."
+  exit 1
+fi
 shift # Remove schema_name from argument list
 
 # Process remaining arguments for --skip-workspace
@@ -38,13 +44,13 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-USERNAME_UPPER=$(echo $USERNAME | tr '[:lower:]' '[:upper:]')
-USERNAME_LOWER=$(echo $USERNAME | tr '[:upper:]' '[:lower:]')
+USERNAME_UPPER=$(echo "$USERNAME" | tr '[:lower:]' '[:upper:]')
+USERNAME_LOWER=$(echo "$USERNAME" | tr '[:upper:]' '[:lower:]')
 
 # if user exists in .env file
-if user_in_env_bool $USERNAME; then
+if user_in_env_bool "$USERNAME"; then
 
-  if user_exists_in_db $USERNAME; then
+  if user_exists_in_db "$USERNAME"; then
     echo "User $USERNAME already exists in the database"
     exit 0
   fi
@@ -63,7 +69,7 @@ else
   echo "${USERNAME_UPPER}_USER_PASSWORD=\"$USER_PASSWORD\"" >>.env
 fi
 
-sql -name $DB_CONN_NAME <<SQL
+sql -name "$DB_CONN_NAME" <<SQL
   select user from dual;
 
   create tablespace tbs_${USERNAME_LOWER}
@@ -138,9 +144,9 @@ if [ "$skip_workspace" = true ]; then
   echo "skipped workspace creation"
 else
   # get workspace settings (extended session timeout, etc)
-  WS_SETTINGS=$(get_ws_settings $USERNAME)
+  WS_SETTINGS=$(get_ws_settings "$USERNAME")
 
-  sql -name $DB_CONN_NAME <<SQL
+  sql -name "$DB_CONN_NAME" <<SQL
     select user from dual;
 
     BEGIN
@@ -202,7 +208,7 @@ fi
 
 USER_DB_CONN_NAME="${DB_CONN_BASE}-${USERNAME_LOWER}"
 
-sql ${USERNAME_LOWER}/${USER_PASSWORD}@localhost:1521/FREEPDB1 <<SQL
+sql "${USERNAME_LOWER}"/"${USER_PASSWORD}"@localhost:1521/FREEPDB1 <<SQL
   select user from dual;
 
   conn -save ${USER_DB_CONN_NAME} -savepwd -replace
