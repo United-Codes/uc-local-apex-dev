@@ -12,7 +12,7 @@ These scripts will use the `UC_TESTINSTALL_1` schema and workspace to install ap
 Test application installations in a clean environment:
 
 ```bash
-local-23ai.sh test-app-install ./path/to/my_app.sql
+local-26ai.sh test-app-install ./path/to/my_app.sql
 ```
 
 This will:
@@ -25,12 +25,20 @@ This will:
   - List of invalid objects
   - APEX object dependency scan results
 
-## Test SQL Scripts
+### Skip Confirmation
 
-Test application installations in a clean environment:
+To skip the confirmation prompt (useful for automation), use the `-y` flag:
 
 ```bash
-local-23ai.sh test-script-install ./path/to/sql_script.sql
+local-26ai.sh test-app-install ./path/to/my_app.sql -y
+```
+
+## Test SQL Scripts
+
+Test SQL scripts in a clean environment:
+
+```bash
+local-26ai.sh test-script-install ./path/to/sql_script.sql
 ```
 
 This will:
@@ -40,3 +48,11 @@ This will:
 - Provide a summary with:
   - Object types and counts
   - List of invalid objects
+
+### Skip Confirmation
+
+To skip the confirmation prompt (useful for automation), use the `-y` flag:
+
+```bash
+local-26ai.sh test-script-install ./path/to/sql_script.sql -y
+```

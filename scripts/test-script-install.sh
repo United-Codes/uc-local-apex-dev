@@ -6,8 +6,14 @@ source ./scripts/util/load_env.sh
 source ./scripts/util/user-exists-in-db.sh
 
 if [ -z "$1" ]; then
-  echo "Usage: $0 <path to install script>"
+  echo "Usage: $0 <path to install script> [-y]"
   exit 1
+fi
+
+# Check for -y flag
+AUTO_YES=false
+if [[ "$2" == "-y" ]]; then
+  AUTO_YES=true
 fi
 
 # If the input path is relative (doesn't start with /)
@@ -43,7 +49,11 @@ fi
 USER_NAME="UC_TESTINSTALL_1"
 
 if user_exists_in_db $USER_NAME; then
-  ./scripts/clear-schema.sh $USER_NAME
+  if [[ "$AUTO_YES" == "true" ]]; then
+    ./scripts/clear-schema.sh $USER_NAME -y
+  else
+    ./scripts/clear-schema.sh $USER_NAME
+  fi
 else
   echo "user $USER_NAME does not exist"
   ./scripts/create-user.sh $USER_NAME

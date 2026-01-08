@@ -15,11 +15,11 @@ Once your environment is set up, these are the most common tasks you'll perform 
 
 ```bash
 # Stop database
-local-23ai.sh stop
+local-26ai.sh stop
 # You could also run this, but the script will gracefully stop the database
 # docker-compose stop
 
-local-23ai.sh start
+local-26ai.sh start
 # Or
 # docker-compose start
 ```
@@ -53,7 +53,7 @@ Access via: https://localhost:8443/ords (Port 8443 instead of 8181).
 Keep in mind that the FREE database has a space limitation of 12GB. You can check the used space with:
 
 ```bash
-local-23ai.sh used-space
+local-26ai.sh used-space
 
 #    CURRENT_GB    LIMIT_GB    PERCENT_OF_LIMIT STATUS
 # _____________ ___________ ___________________ _________
@@ -75,7 +75,7 @@ local-23ai.sh used-space
 If your tablespaces have grown over it's actually used space, you can shrink them to reclaim space. This can take a while.
 
 ```bash
-local-23ai.sh shrink-space
+local-26ai.sh shrink-space
 ```
 
 ### Disable Archive Logs
@@ -85,6 +85,53 @@ For development environments, you might want to disable archive logging. You wil
 ```bash
 ./scripts/disable-archive-logs.sh
 ```
+
+### Manage APEX Account Expiration
+
+#### Unexpire Accounts
+
+If APEX_PUBLIC_USER or workspace accounts are locked due to password expiration, unlock them with:
+
+```bash
+./scripts/unexpire-accounts.sh
+```
+
+This is useful after database migrations or when accounts have expired due to time constraints.
+
+#### Disable Password Expiration
+
+To prevent APEX workspace accounts from expiring in the future:
+
+```bash
+./scripts/disable-password-expiration.sh
+```
+
+<Aside type="note">
+  Even with password expiration disabled, users may still be prompted to change
+  their password on their first login after a migration.
+</Aside>
+
+## Workspace Import/Export
+
+### Import All Exports
+
+Automatically import all export files from the `./backups/import/` directory:
+
+```bash
+./scripts/import-all.sh
+```
+
+This is particularly useful during database migrations when you need to bulk import multiple workspaces and schemas. The script will provide a summary of successful and failed imports.
+
+### Fix Workspace Export Issues
+
+When re-importing APEX workspaces, you may encounter issues due to a [known bug with group assignments](https://forums.oracle.com/ords/apexds/post/apex-18-2-failing-to-import-workspace-5048). Fix this automatically:
+
+```bash
+./scripts/fix-ws-group-ids.sh
+```
+
+This script updates all export files in `./backups/import/` to remove problematic group ID parameters, allowing successful re-import.
 
 ## Complete Environment Reset
 

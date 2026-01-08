@@ -1,12 +1,12 @@
-name: docker-apex-24-1
+name: uc-local-apex-dev
 services:
-  23ai:
+  26ai:
     ports:
       - 1521:1521
     env_file:
       - ./.env
     volumes:
-      - oradata:/opt/oracle/oradata
+      - oradata-26ai:/opt/oracle/oradata
     restart: no
     healthcheck:
       #test: ["CMD", "healthcheck.sh"]
@@ -15,10 +15,10 @@ services:
       retries: 10
       start_period: 5s
       #start_interval: 5s
-    container_name: local-23ai
-    image: container-registry.oracle.com/database/free:23.8.0.0
+    container_name: local-26ai
+    image: container-registry.oracle.com/database/free:23.26.0.0
 
-  ords:
+  ords-26ai:
     ports:
       - 8181:8080
       - 8443:8443
@@ -35,15 +35,15 @@ services:
     environment:
       - DEBUG=true
     depends_on:
-      23ai:
+      26ai:
         condition: service_healthy
-    image: container-registry.oracle.com/database/ords:25.2.0
-    container_name: local-ords
+    image: container-registry.oracle.com/database/ords:25.4.0
+    container_name: local-26ai-ords
 
 networks:
   default:
     driver: bridge
 
 volumes:
-  oradata:
-    name: oradata
+  oradata-26ai:
+    name: oradata-26ai

@@ -6,10 +6,16 @@ source ./scripts/util/load_env.sh
 source ./scripts/util/user_in_env.sh
 
 if [ -z "$1" ]; then
-  echo "Usage: $0 <schema_name>"
+  echo "Usage: $0 <schema_name> [-y]"
   exit 1
 fi
 USERNAME=$1
+
+# Check for -y flag
+AUTO_YES=false
+if [[ "$2" == "-y" ]]; then
+  AUTO_YES=true
+fi
 
 USERNAME_UPPER=$(echo "$USERNAME" | tr '[:lower:]' '[:upper:]')
 USERNAME_LOWER=$(echo "$USERNAME" | tr '[:upper:]' '[:lower:]')
@@ -21,7 +27,12 @@ fi
 
 user_in_env "$USERNAME"
 
-read -r -p "Dropping all objects in schema $USERNAME_UPPER. Do you want to continue? (y/n) " answer
+if [[ "$AUTO_YES" == "true" ]]; then
+  echo "Dropping all objects in schema $USERNAME_UPPER (auto-confirmed with -y)..."
+  answer="y"
+else
+  read -r -p "Dropping all objects in schema $USERNAME_UPPER. Do you want to continue? (y/n) " answer
+fi
 
 if [[ $answer == "y" ]] || [[ $answer == "Y" ]]; then
   echo "Continuing..."
@@ -41,7 +52,12 @@ else
   echo "Stopping..."
 fi
 
-read -r -p "Drop APEX applications? (y/n) " answer2
+if [[ "$AUTO_YES" == "true" ]]; then
+  echo "Dropping APEX applications (auto-confirmed with -y)..."
+  answer2="y"
+else
+  read -r -p "Drop APEX applications? (y/n) " answer2
+fi
 
 if [[ $answer2 == "y" ]] || [[ $answer2 == "Y" ]]; then
   sql -name "$USER_DB_CONN_NAME" <<SQL

@@ -22,7 +22,9 @@ BEGIN
     
     <<objects>>
     FOR cur_rec IN (SELECT object_name, object_type 
-                    FROM   user_objects) LOOP
+                      FROM user_objects
+                     WHERE object_type not in ('CREDENTIAL'))
+    LOOP
       BEGIN
         l_count := l_count + 1;
         l_cascade := NULL;

@@ -6,9 +6,17 @@ source ./scripts/util/load_env.sh
 source ./scripts/util/user-exists-in-db.sh
 
 if [ -z "$1" ]; then
-  echo "Usage: $0 <path to application file>"
+  echo "Usage: $0 <path to application file> [-y]"
   exit 1
 fi
+
+
+# Check for -y flag
+AUTO_YES=false
+if [[ "$2" == "-y" ]]; then
+  AUTO_YES=true
+fi
+
 
 # If the input path is relative (doesn't start with /)
 if [[ "${1}" != /* ]]; then
@@ -44,7 +52,11 @@ RANDOM_NUMBER=$(shuf -i 0-9 -n 6 | tr -d '\n')
 USER_NAME="UC_TESTINSTALL_1"
 
 if user_exists_in_db $USER_NAME; then
-  ./scripts/clear-schema.sh $USER_NAME
+  if [[ "$AUTO_YES" == "true" ]]; then
+    ./scripts/clear-schema.sh $USER_NAME -y
+  else
+    ./scripts/clear-schema.sh $USER_NAME
+  fi
 else
   echo "user $USER_NAME does not exist"
   ./scripts/create-user.sh $USER_NAME

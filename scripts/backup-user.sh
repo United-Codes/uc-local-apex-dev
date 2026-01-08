@@ -98,4 +98,19 @@ sql -name "$USER_DB_CONN_NAME" <<SQL
     exit;
 SQL
 
+# create directory for ORDS export
+if [ ! -d ./backups/export/ords/"$USERNAME_LOWER" ]; then
+  mkdir -p ./backups/export/ords/"$USERNAME_LOWER"
+fi
+
+cd ./backups/export/ords/"$USERNAME_LOWER"
+
+sql -name "$USER_DB_CONN_NAME" -silent > rest_schema.sql <<SQL
+  rest export schema
+  exit;
+SQL
+
+cd "$ORIGINAL_PWD"
+
+
 ./scripts/sync-backups-folder.sh

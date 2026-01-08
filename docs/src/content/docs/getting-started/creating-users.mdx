@@ -12,7 +12,7 @@ import { Aside } from "@astrojs/starlight/components";
 Create a new database schema and APEX workspace in one command:
 
 ```bash
-local-23ai.sh create-user movies
+local-26ai.sh create-user movies
 ```
 
 This will:
@@ -36,7 +36,7 @@ This will:
 If you only need a database schema without an APEX workspace:
 
 ```bash
-local-23ai.sh create-user myschema --skip_workspace
+local-26ai.sh create-user myschema --skip_workspace
 ```
 
 ### Clear a Schema
@@ -44,8 +44,14 @@ local-23ai.sh create-user myschema --skip_workspace
 Useful for testing installation scripts multiple times:
 
 ```bash
-local-23ai.sh clear-schema movies
+local-26ai.sh clear-schema movies
 # Asks for confirmation before proceeding
+```
+
+To skip the confirmation prompt (useful for automation), use the `-y` flag:
+
+```bash
+local-26ai.sh clear-schema movies -y
 ```
 
 <Aside type="caution" title="Data Loss Warning">
@@ -58,7 +64,7 @@ local-23ai.sh clear-schema movies
 Completely remove a schema and all its objects:
 
 ```bash
-local-23ai.sh drop-user movies
+local-26ai.sh drop-user movies
 ```
 
 ## Database Access
@@ -69,10 +75,10 @@ All created users are automatically stored in SQLcl's connection store:
 
 ```bash
 # Connect using the stored connection
-sql -name local-23ai-movies
+sql -name local-26ai-movies
 
 # Connect to sys user
-sql -name local-23ai-sys
+sql -name local-26ai-sys
 ```
 
 You will also find the connections in the VS Code SQL Developer extension. You might need to refresh the connections list after creating a new user.
@@ -81,7 +87,7 @@ You will also find the connections in the VS Code SQL Developer extension. You m
 
 Use these connection details for other development tools:
 
-- **Host**: 23ai
+- **Host**: 26ai
 - **Port**: 1521
 - **Service**: FREEPDB1
 - **Username**: Your schema name

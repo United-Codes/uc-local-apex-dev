@@ -17,11 +17,11 @@ echo "ORACLE_PASSWORD=\"$SYS_PASSWORD\"" >.env
 echo "ORACLE_PWD=\"$SYS_PASSWORD\"" >>.env
 #echo "APP_USER=\"$APP_USER\"" >>.env
 #echo "APP_USER_PASSWORD=\"$APP_USER_PASSWORD\"" >>.env
-echo "DB_CONN_BASE=local-23ai" >>.env
-echo "DB_CONN_NAME=local-23ai-sys" >>.env
-echo "CONTAINER_NAME=local-23ai" >>.env
+echo "DB_CONN_BASE=local-26ai" >>.env
+echo "DB_CONN_NAME=local-26ai-sys" >>.env
+echo "CONTAINER_NAME=local-26ai" >>.env
 echo "DBSERVICENAME=\"FREEPDB1\"" >>.env
-echo "DBHOST=\"23ai\"" >>.env
+echo "DBHOST=\"26ai\"" >>.env
 echo "DBPORT=\"1521\"" >>.env
 echo "FORCE_SECURE=\"false\"" >>.env
 
