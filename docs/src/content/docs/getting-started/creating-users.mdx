@@ -48,6 +48,12 @@ local-26ai.sh clear-schema movies
 # Asks for confirmation before proceeding
 ```
 
+To skip the confirmation prompt (useful for automation), use the `-y` flag:
+
+```bash
+local-26ai.sh clear-schema movies -y
+```
+
 <Aside type="caution" title="Data Loss Warning">
   This drops ALL objects in the schema. Never run this accidentally on important
   schemas! Or better: run backups regularly.
@@ -69,10 +75,10 @@ All created users are automatically stored in SQLcl's connection store:
 
 ```bash
 # Connect using the stored connection
-sql -name local-23ai-movies
+sql -name local-26ai-movies
 
 # Connect to sys user
-sql -name local-23ai-sys
+sql -name local-26ai-sys
 ```
 
 You will also find the connections in the VS Code SQL Developer extension. You might need to refresh the connections list after creating a new user.
@@ -81,7 +87,7 @@ You will also find the connections in the VS Code SQL Developer extension. You m
 
 Use these connection details for other development tools:
 
-- **Host**: 23ai
+- **Host**: 26ai
 - **Port**: 1521
 - **Service**: FREEPDB1
 - **Username**: Your schema name

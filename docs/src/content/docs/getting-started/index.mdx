@@ -7,7 +7,7 @@ sidebar:
 
 import { Aside } from "@astrojs/starlight/components";
 
-Get your Oracle 23ai database with APEX and ORDS running locally in just a few minutes. This guide will walk you through the complete setup process.
+Get your Oracle 26ai database with APEX and ORDS running locally in just a few minutes. This guide will walk you through the complete setup process.
 
 ## Prerequisites
 
@@ -121,6 +121,12 @@ If you get an error messsage saying "Account Is Locked" run the following:
 ```
 
 You can now reload the APEX page at http://localhost:8181/ords/apex and should see no more error messages.
+
+If you don't want APEX to force you to change passwords, you can also run the disable password expiration script:
+
+```sh
+./scripts/disable-password-expiration.sh
+```
 
 ### 7. PATH Configuration
 

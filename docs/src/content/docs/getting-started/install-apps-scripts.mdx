@@ -25,9 +25,17 @@ This will:
   - List of invalid objects
   - APEX object dependency scan results
 
+### Skip Confirmation
+
+To skip the confirmation prompt (useful for automation), use the `-y` flag:
+
+```bash
+local-26ai.sh test-app-install ./path/to/my_app.sql -y
+```
+
 ## Test SQL Scripts
 
-Test application installations in a clean environment:
+Test SQL scripts in a clean environment:
 
 ```bash
 local-26ai.sh test-script-install ./path/to/sql_script.sql
@@ -40,3 +48,11 @@ This will:
 - Provide a summary with:
   - Object types and counts
   - List of invalid objects
+
+### Skip Confirmation
+
+To skip the confirmation prompt (useful for automation), use the `-y` flag:
+
+```bash
+local-26ai.sh test-script-install ./path/to/sql_script.sql -y
+```

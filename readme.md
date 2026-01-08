@@ -1,20 +1,20 @@
 # UC Local APEX Dev
 
-**Have a 23ai with APEX and ORDS running in a few minutes**
+**Get Oracle 26ai with APEX and ORDS running in minutes. Automate the tedious parts of local APEX development.**
 
-This set of scripts aims to make developing APEX on your local machine as easy as possible. It is a ready-to-use setup with common tasks automated as bash scripts.
+A containerized development environment (works with Docker, Podman, or any container runtime) that automates common tasks and lets you focus on building APEX applications.
 
 ## Features
 
-- ✅ Create users and workspaces with optimal settings with a single command
-- ✅ All users are stored for easy access with SQLcl or VS Code SQL Developer
-- ✅ Easily delete all data to test installation scripts multiple times
-- ✅ Backup and restore your data, workspaces and apps
-- ✅ Run ORDS with SSL
-- ✅ Test APEX application installs
-- ✅ VS Code SQL Developer debugger support
+- ✅ One-command operations: create users, backups, clear schemas, test installs
+- ✅ Create APEX workspaces and database schemas with optimal development grants
+- ✅ All users automatically registered in SQLcl and VS Code for instant access
+- ✅ Built-in Oracle DataPump backup and restore
+- ✅ ORDS with SSL support for production-like local development
+- ✅ Test APEX application installs repeatedly in isolated test schemas
+- ✅ Full PL/SQL debugging support with VS Code SQL Developer
 
-**This is not for production use!** The environment is configured to be unsecure to make development as easy as possible.
+**⚠️ This is not for production use!** Intentionally unsecure and optimized for ease of development. Passwords stored in plain text, security features relaxed. For local development only.
 
 [Installation Guide](https://www.united-codes.com/products/uc-local-apex-dev/docs/getting-started/)
 
