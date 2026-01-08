@@ -1,0 +1,44 @@
+---
+import type { Props } from '@astrojs/starlight/props';
+import Default from '@astrojs/starlight/components/Head.astro';
+
+// JSON-LD structured data for UC AI library/SDK
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "uc-local-apex-dev",
+  "applicationCategory": "DeveloperApplication",
+  "operatingSystem": "Linux, macOS, Windows",
+  "description": "Containerized Oracle APEX development environment with 26ai database and ORDS. Set up local APEX development in minutes with automated workspace management, backups, and testing tools.",
+  "offers": {
+    "@type": "Offer",
+    "price": "0",
+    "priceCurrency": "USD"
+  },
+  "author": {
+    "@type": "Organization",
+    "name": "United Codes",
+    "url": "https://www.united-codes.com"
+  },
+  "url": "https://www.united-codes.com/products/uc-local-apex-dev/docs/",
+  "downloadUrl": "https://github.com/United-Codes/uc-local-apex-dev",
+  "codeRepository": "https://github.com/United-Codes/uc-local-apex-dev",
+  "programmingLanguage": ["Shell", "SQL", "PL/SQL"],
+  "softwareRequirements": "Docker or Podman, docker-compose, SQLcl, Bash-compatible shell",
+  "featureList": [
+    "Quick setup with Oracle 26ai database",
+    "Oracle APEX 24.2+ with admin access",
+    "Oracle ORDS with SSL support",
+    "Automated user and workspace creation",
+    "Built-in DataPump backup and restore",
+    "PL/SQL debugging support",
+    "Installation testing for APEX applications",
+    "SQLcl and VS Code integration"
+  ],
+  "keywords": "Oracle APEX, Oracle Database, ORDS, local development, containerized, Docker, Podman, PL/SQL, workspace management, backup, DataPump"
+}
+---
+
+<Default {...Astro.props}><slot /></Default>
+
+<script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
