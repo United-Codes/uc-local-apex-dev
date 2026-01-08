@@ -45,5 +45,5 @@ To update the APEX images (assets):
 ```sh
 # make sure you are in the directory of the unzipped patch directory
 
-cp -r ./images/r {path_to_your_cloned_repo}/apex-images
+cp -r ./images/* {path_to_your_cloned_repo}/apex-images
 ```

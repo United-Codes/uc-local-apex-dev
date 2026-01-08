@@ -15,11 +15,11 @@ Once your environment is set up, these are the most common tasks you'll perform 
 
 ```bash
 # Stop database
-local-23ai.sh stop
+local-26ai.sh stop
 # You could also run this, but the script will gracefully stop the database
 # docker-compose stop
 
-local-23ai.sh start
+local-26ai.sh start
 # Or
 # docker-compose start
 ```
@@ -53,7 +53,7 @@ Access via: https://localhost:8443/ords (Port 8443 instead of 8181).
 Keep in mind that the FREE database has a space limitation of 12GB. You can check the used space with:
 
 ```bash
-local-23ai.sh used-space
+local-26ai.sh used-space
 
 #    CURRENT_GB    LIMIT_GB    PERCENT_OF_LIMIT STATUS
 # _____________ ___________ ___________________ _________
@@ -75,7 +75,7 @@ local-23ai.sh used-space
 If your tablespaces have grown over it's actually used space, you can shrink them to reclaim space. This can take a while.
 
 ```bash
-local-23ai.sh shrink-space
+local-26ai.sh shrink-space
 ```
 
 ### Disable Archive Logs

@@ -17,4 +17,4 @@ exit;
 EOF"
 
 echo "Removing archive logs"
-docker exec "$CONTAINER_NAME" bash -c "cd /opt/oracle/product/23ai/dbhomeFree/dbs && rm arch1*.dbf"
+docker exec "$CONTAINER_NAME" bash -c "cd /opt/oracle/product/26ai/dbhomeFree/dbs && rm arch1*.dbf"

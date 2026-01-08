@@ -20,6 +20,14 @@ rm -rf ./META-INF || true
 
 ```sh
 cd apex
+sql -name local-23ai-sys @apexins.sql TBS_APEX TBS_APEX TEMP /i/
+exit;
+```
+
+(If your are still on 23ai use `SYSAUX` instead)
+
+```sh
+cd apex
 sql -name local-23ai-sys @apexins.sql SYSAUX SYSAUX TEMP /i/
 exit;
 ```
