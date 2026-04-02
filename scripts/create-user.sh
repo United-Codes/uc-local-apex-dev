@@ -114,6 +114,11 @@ sql -name "$DB_CONN_NAME" <<SQL
   grant execute on dbms_xmlgen to ${USERNAME};
   grant execute on dbms_sql    to ${USERNAME};
   grant execute on dbms_random to ${USERNAME};
+  grant execute on dbms_aqadm to ${USERNAME};
+  grant execute on dbms_aq to ${USERNAME};
+  grant execute on javascript to ${USERNAME};
+  grant aq_administrator_role to ${USERNAME};
+  grant select_catalog_role to ${USERNAME};
 
   grant debug connect session to ${USERNAME};
   grant debug connect any to ${USERNAME};
