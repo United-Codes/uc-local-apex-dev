@@ -83,10 +83,7 @@ echo "Installing APEX"
 
 cd ./apex || exit 1
  
-sql -name "$DB_CONN_NAME" <<SQL
-@apexins.sql TBS_APEX TBS_APEX TEMP /i/
-exit;
-SQL
+sql -name "$DB_CONN_NAME" @apexins.sql TBS_APEX TBS_APEX TEMP /i/
 
 cd ..
 
@@ -149,7 +146,11 @@ SQL
 
 ./scripts/sync-backups-folder.sh
 
-read -r -p "Do you want to disable archive logs (recommended if this is just a dev environment)? [Y/n] " answer
+if [ -t 0 ]; then
+  read -r -p "Do you want to disable archive logs (recommended if this is just a dev environment)? [Y/n] " answer
+else
+  answer="Y"
+fi
 
 if [[ $answer == "n" ]] || [[ $answer == "N" ]]; then
   echo "Keeping archive logs enabled"
