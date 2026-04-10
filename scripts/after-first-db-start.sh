@@ -83,7 +83,11 @@ echo "Installing APEX"
 
 cd ./apex || exit 1
  
-sql -name "$DB_CONN_NAME" @apexins.sql TBS_APEX TBS_APEX TEMP /i/
+sql -name "$DB_CONN_NAME" <<SQL
+whenever sqlerror exit sql.sqlcode
+@apexins.sql TBS_APEX TBS_APEX TEMP /i/
+exit;
+SQL
 
 cd ..
 
