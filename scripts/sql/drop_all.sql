@@ -33,7 +33,13 @@ BEGIN
           EXECUTE IMMEDIATE 'BEGIN sys.DBMS_SCHEDULER.DROP_JOB(''' || cur_rec.object_name || ''', TRUE); END;';
           CONTINUE;
         END IF;
-
+        --
+        if cur_rec.object_type = 'PROGRAM'
+        then
+           execute IMMEDIATE 'begin sys.dbms_scheduler.drop_program (program_name => '''||cur_rec.object_name||''',force => true); end;';
+           continue;
+        end if;
+        --
         IF cur_rec.object_type = 'TABLE' THEN
           l_cascade := ' CASCADE CONSTRAINTS';
         END IF;
