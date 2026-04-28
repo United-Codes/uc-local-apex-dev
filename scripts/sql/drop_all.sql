@@ -33,7 +33,13 @@ BEGIN
           EXECUTE IMMEDIATE 'BEGIN sys.DBMS_SCHEDULER.DROP_JOB(''' || cur_rec.object_name || ''', TRUE); END;';
           CONTINUE;
         END IF;
-
+        --
+        if cur_rec.object_type = 'PROGRAM'
+        then
+           execute IMMEDIATE 'begin sys.dbms_scheduler.drop_program (program_name => '''||cur_rec.object_name||''',force => true); end;';
+           continue;
+        end if;
+        --
         IF cur_rec.object_type = 'TABLE' THEN
           l_cascade := ' CASCADE CONSTRAINTS';
         END IF;
@@ -43,6 +49,18 @@ BEGIN
           NULL;
       END;
     END LOOP objects;
+    <<queues>>
+    for rec in (select queue_table
+                  from user_queue_tables)
+    loop
+       begin
+        l_count := l_count + 1;
+        execute immediate 'begin sys.dbms_aqadm.drop_queue_table ('''||rec.queue_table||''', true); end;';
+       exception
+       when others
+       then null;
+       end;
+    end loop queues;
     -- Comment out the following line if you are pre-10g, or want to preserve the recyclebin contents. 
     EXECUTE IMMEDIATE 'PURGE RECYCLEBIN';
     sys.DBMS_OUTPUT.put_line('Pass: ' || i || '  Drops: ' || l_count);
