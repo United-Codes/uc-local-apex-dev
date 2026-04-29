@@ -46,7 +46,8 @@ SQL
 
   echo "dropped schema $USERNAME_UPPER."
 
-  echo "You have to manually remove the connection from connmgr :/. I hope SQLcl implements this soon."
+  # echo "You have to manually remove the connection from connmgr :/. I hope SQLcl implements this soon."
+  source ./scripts/util/drop-sqlcl-connection.sh
   # USER_DB_CONN_NAME="${DB_CONN_BASE}-${USERNAME_LOWER}"
   #   sql -nolog <<SQL
   #     connmgr ...
