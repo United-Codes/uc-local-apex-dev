@@ -23,7 +23,7 @@ BEGIN
     <<objects>>
     FOR cur_rec IN (SELECT object_name, object_type 
                       FROM user_objects
-                     WHERE object_type not in ('CREDENTIAL'))
+                     WHERE object_type not in ('CREDENTIAL', 'INDEX', 'LOB'))
     LOOP
       BEGIN
         l_count := l_count + 1;
