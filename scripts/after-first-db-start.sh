@@ -124,6 +124,11 @@ sql -name "$DB_CONN_NAME" <<SQL
         set VALUE = 10000
       where NAME = 'ACCOUNT_LIFETIME_DAYS'
     !';
+
+    execute IMMEDIATE ' update ' || l_username || q'!.wwv_flow_platform_prefs
+        set VALUE = 3
+      where NAME = 'MAX_APPLICATION_BACKUPS'
+    !';
     commit;
 
     -- ACL to allow web service requests
@@ -143,6 +148,11 @@ sql -name "$DB_CONN_NAME" <<SQL
 
   commit;
 SQL
+
+read -r -p "Enter the APEX Internal ADMIN password [Welcome_1]: " ADMIN_PWD
+ADMIN_PWD=${ADMIN_PWD:-Welcome_1}
+echo "Changing Internal ADMIN password to $ADMIN_PWD"
+echo -e "ADMIN\nADMIN\n$ADMIN_PWD" | sql -name "$DB_CONN_NAME" @apxchpwd.sql
 
 ./scripts/sync-backups-folder.sh
 
