@@ -54,9 +54,9 @@ SQL
   # SQL
 
   # remove user from .env file
-  sed -i '' "/${USERNAME_UPPER}_USER_PASSWORD/d" ./.env
+  sed -e "/${USERNAME_UPPER}_USER_PASSWORD/ s/^/# /" -e "/${USERNAME_UPPER}_USER_PASSWORD/ s/$/ # deleted/" ./.env > ./.env.tmp && mv ./.env.tmp ./.env
 
-  echo "Removed user $USERNAME_UPPER from .env file"
+  echo "Commented out user $USERNAME_UPPER in .env file"
 else
   echo "Stopping..."
 fi
