@@ -9,3 +9,13 @@ fi
 export $(grep -v '^#' .env | xargs)
 
 echo "loaded .env file"
+
+# Detect docker compose command (standalone vs plugin)
+if command -v docker-compose &>/dev/null; then
+  DOCKER_COMPOSE="docker-compose"
+elif docker compose version &>/dev/null 2>&1; then
+  DOCKER_COMPOSE="docker compose"
+else
+  echo "Error: neither 'docker-compose' nor 'docker compose' found"
+  exit 1
+fi

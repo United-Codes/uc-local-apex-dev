@@ -100,5 +100,5 @@ Darwin*)
 esac
 
 echo "Successfully installed certificate to system trust store"
-echo "Please restart ORDS to apply changes: docker-compose restart ords"
+echo "Please restart ORDS to apply changes: $DOCKER_COMPOSE restart ords"
 echo "Only access ORDS via HTTPS: https://localhost:8181/ords/_/landing"

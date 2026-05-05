@@ -9,4 +9,4 @@ docker exec $CONTAINER_NAME bash -c "echo 'shutdown immediate;
 exit' | sqlplus / as sysdba && exit"
 
 echo "Stopping Containers"
-docker-compose -f docker-compose.yml stop
+$DOCKER_COMPOSE -f docker-compose.yml stop
