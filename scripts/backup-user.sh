@@ -68,8 +68,8 @@ else
   else
     # remove existing files
     rm -rf ./backups/export/apex/bkp/"$USERNAME_LOWER"/* || true
-  fi
-  mv ./backups/export/apex/"$USERNAME_LOWER"/* ./backups/export/apex/bkp/"$USERNAME_LOWER"
+fi
+  mv ./backups/export/apex/"$USERNAME_LOWER"/* ./backups/export/apex/bkp/"$USERNAME_LOWER" || true
 fi
 
 cd ./backups/export/apex/"$USERNAME_LOWER"
@@ -77,8 +77,22 @@ cd ./backups/export/apex/"$USERNAME_LOWER"
 sql -name "$USER_DB_CONN_NAME" <<SQL
     select user from dual;
 
-    column workspace_id new_value workspace_id
+    column workspace_id new_value workspace_id format 99999999999999999999
     select workspace_id from apex_workspaces fetch first row only;
+
+    declare
+      l_ws_name apex_workspaces.workspace_display_name%type;
+      l_sec_id number;
+    begin
+      select workspace_display_name
+        into l_ws_name
+        from apex_workspaces
+       fetch first 1 row only;
+
+      l_sec_id := apex_util.find_security_group_id(p_workspace => l_ws_name);
+      apex_util.set_security_group_id (p_security_group_id => l_sec_id);
+    end;
+    /
 
     apex export-workspace -woi &workspace_id -overwrite-files
     apex export-all-applications -woi &workspace_id -overwrite-files
