@@ -16,7 +16,7 @@ services:
       start_period: 5s
       #start_interval: 5s
     container_name: local-26ai
-    image: container-registry.oracle.com/database/free:23.26.0.0
+    image: container-registry.oracle.com/database/free:23.26.1.0
 
   ords-26ai:
     ports:
@@ -37,7 +37,7 @@ services:
     depends_on:
       26ai:
         condition: service_healthy
-    image: container-registry.oracle.com/database/ords:25.4.0
+    image: container-registry.oracle.com/database/ords:26.1.0
     container_name: local-26ai-ords
 
 networks:

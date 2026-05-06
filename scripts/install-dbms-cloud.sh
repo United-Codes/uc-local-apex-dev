@@ -36,7 +36,12 @@ rm dbc_certs.tar
 echo "Certificates extracted to $TEMP_DIR"
 
 # create wallet directory
-docker exec -u oracle -it "${CONTAINER_NAME}" bash -c 'cd /opt/oracle/oradata; mkdir -p wallets/ssl'
+DOCKER_IT_FLAGS=""
+if [ -t 0 ]; then
+  DOCKER_IT_FLAGS="-it"
+fi
+
+docker exec -u oracle $DOCKER_IT_FLAGS "${CONTAINER_NAME}" bash -c 'cd /opt/oracle/oradata; mkdir -p wallets/ssl'
 
 # copy certificates to wallet directory
 docker cp "$TEMP_DIR/." "${CONTAINER_NAME}:/opt/oracle/oradata/wallets/ssl/"
@@ -45,7 +50,7 @@ docker cp "$TEMP_DIR/." "${CONTAINER_NAME}:/opt/oracle/oradata/wallets/ssl/"
 docker exec -u root "${CONTAINER_NAME}" chown -R oracle:oinstall /opt/oracle/oradata/wallets/ssl/
 
 # add files to wallet
-docker exec -u oracle -it "${CONTAINER_NAME}" bash -c "
+docker exec -u oracle $DOCKER_IT_FLAGS "${CONTAINER_NAME}" bash -c "
 set -e
 
 cd /opt/oracle/oradata/wallets/ssl/

@@ -83,10 +83,7 @@ echo "Installing APEX"
 
 cd ./apex || exit 1
  
-sql -name "$DB_CONN_NAME" <<SQL
-@apexins.sql TBS_APEX TBS_APEX TEMP /i/
-exit;
-SQL
+sql -name "$DB_CONN_NAME" @apexins.sql TBS_APEX TBS_APEX TEMP /i/
 
 cd ..
 
@@ -127,6 +124,11 @@ sql -name "$DB_CONN_NAME" <<SQL
         set VALUE = 10000
       where NAME = 'ACCOUNT_LIFETIME_DAYS'
     !';
+
+    execute IMMEDIATE ' update ' || l_username || q'!.wwv_flow_platform_prefs
+        set VALUE = 3
+      where NAME = 'MAX_APPLICATION_BACKUPS'
+    !';
     commit;
 
     -- ACL to allow web service requests
@@ -147,9 +149,18 @@ sql -name "$DB_CONN_NAME" <<SQL
   commit;
 SQL
 
+read -r -p "Enter the APEX Internal ADMIN password [Welcome_1]: " ADMIN_PWD
+ADMIN_PWD=${ADMIN_PWD:-Welcome_1}
+echo "Changing Internal ADMIN password to $ADMIN_PWD"
+echo -e "ADMIN\nADMIN\n$ADMIN_PWD" | sql -name "$DB_CONN_NAME" @apxchpwd.sql
+
 ./scripts/sync-backups-folder.sh
 
-read -r -p "Do you want to disable archive logs (recommended if this is just a dev environment)? [Y/n] " answer
+if [ -t 0 ]; then
+  read -r -p "Do you want to disable archive logs (recommended if this is just a dev environment)? [Y/n] " answer
+else
+  answer="Y"
+fi
 
 if [[ $answer == "n" ]] || [[ $answer == "N" ]]; then
   echo "Keeping archive logs enabled"

@@ -46,16 +46,17 @@ SQL
 
   echo "dropped schema $USERNAME_UPPER."
 
-  echo "You have to manually remove the connection from connmgr :/. I hope SQLcl implements this soon."
+  # echo "You have to manually remove the connection from connmgr :/. I hope SQLcl implements this soon."
+  source ./scripts/util/drop-sqlcl-connection.sh
   # USER_DB_CONN_NAME="${DB_CONN_BASE}-${USERNAME_LOWER}"
   #   sql -nolog <<SQL
   #     connmgr ...
   # SQL
 
   # remove user from .env file
-  sed -i '' "/${USERNAME_UPPER}_USER_PASSWORD/d" ./.env
+  sed -e "/${USERNAME_UPPER}_USER_PASSWORD/ s/^/# /" -e "/${USERNAME_UPPER}_USER_PASSWORD/ s/$/ # deleted/" ./.env > ./.env.tmp && mv ./.env.tmp ./.env
 
-  echo "Removed user $USERNAME_UPPER from .env file"
+  echo "Commented out user $USERNAME_UPPER in .env file"
 else
   echo "Stopping..."
 fi

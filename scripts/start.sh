@@ -4,4 +4,4 @@ set -e
 
 source ./scripts/util/load_env.sh
 
-docker-compose -f docker-compose.yml up -d
+$DOCKER_COMPOSE -f docker-compose.yml up -d
