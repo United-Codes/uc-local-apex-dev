@@ -144,7 +144,9 @@ jobs:
           ./scripts/create-user.sh CITEST1
 
           # User and workspace must exist; saved sqlcl connection must work.
-          sql -S -name "$DB_CONN_NAME" <<'SQL' | tee create_user.out
+          # SQLcl right-pads output to the column width, so strip trailing
+          # whitespace before asserting with `grep -qx`.
+          sql -S -name "$DB_CONN_NAME" <<'SQL' | sed 's/[[:space:]]*$//' | tee create_user.out
           whenever sqlerror exit failure
           set heading off feedback off pagesize 0
           select 'users=' || count(*) from dba_users where username = 'CITEST1';
@@ -158,7 +160,7 @@ jobs:
           grep -q '^CITEST1_USER_PASSWORD=' .env
 
           # The saved per-user connection must be usable
-          sql -S -name "${DB_CONN_BASE}-citest1" <<'SQL' | tee whoami.out
+          sql -S -name "${DB_CONN_BASE}-citest1" <<'SQL' | sed 's/[[:space:]]*$//' | tee whoami.out
           whenever sqlerror exit failure
           set heading off feedback off pagesize 0
           select user from dual;
@@ -176,7 +178,7 @@ jobs:
           # (which isn't always set), so pass an absolute path to be safe.
           ./scripts/test-script-install.sh "$PWD/.github/fixtures/test_install.sql" -y
 
-          sql -S -name "${DB_CONN_BASE}-uc_testinstall_1" <<'SQL' | tee install.out
+          sql -S -name "${DB_CONN_BASE}-uc_testinstall_1" <<'SQL' | sed 's/[[:space:]]*$//' | tee install.out
           whenever sqlerror exit failure
           set heading off feedback off pagesize 0
           select 'table='   || count(*) from user_tables  where table_name  = 'T_WIDGETS';
@@ -230,7 +232,7 @@ jobs:
           # drop-user.sh has an unguarded `read` — feed it a 'y'.
           printf 'y\n' | ./scripts/drop-user.sh CITEST1
 
-          sql -S -name "$DB_CONN_NAME" <<'SQL' | tee drop.out
+          sql -S -name "$DB_CONN_NAME" <<'SQL' | sed 's/[[:space:]]*$//' | tee drop.out
           whenever sqlerror exit failure
           set heading off feedback off pagesize 0
           select 'users=' || count(*) from dba_users where username = 'CITEST1';
@@ -260,7 +262,7 @@ jobs:
           # shellcheck disable=SC1091
           source ./scripts/util/load_env.sh
 
-          sql -S -name "${DB_CONN_BASE}-citest1" <<'SQL' | tee restore.out
+          sql -S -name "${DB_CONN_BASE}-citest1" <<'SQL' | sed 's/[[:space:]]*$//' | tee restore.out
           whenever sqlerror exit failure
           set heading off feedback off pagesize 0
           select 'users='  || count(*) from dba_users where username = 'CITEST1';
@@ -274,7 +276,7 @@ jobs:
           grep -qx 'rows=3'                        restore.out
           grep -qx 'values=row-one,row-three,row-two' restore.out
 
-          sql -S -name "$DB_CONN_NAME" <<'SQL' | tee restore_ws.out
+          sql -S -name "$DB_CONN_NAME" <<'SQL' | sed 's/[[:space:]]*$//' | tee restore_ws.out
           whenever sqlerror exit failure
           set heading off feedback off pagesize 0
           select 'ws=' || count(*) from apex_workspaces where workspace = 'CITEST1';
