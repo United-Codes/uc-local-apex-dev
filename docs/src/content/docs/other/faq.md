@@ -19,7 +19,7 @@ Yes. A folder named `ords-config` will be created in the root directory. You can
 
 We will release new versions of the project with migration guides when new ORDS or database versions are available. So make sure to keep an eye on the [GitHub repository](https://github.com/United-Codes/uc-local-apex-dev) for updates.
 
-## How can I ugprade ORDS?
+## How can I upgrade ORDS?
 
 These will also be covered in the migration guides.
 

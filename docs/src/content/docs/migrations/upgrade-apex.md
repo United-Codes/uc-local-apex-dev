@@ -9,7 +9,7 @@ You don't depend on any changes to this project to upgrade APEX. As soon as an u
 
 ## Versions >= 26.2: use the upgrade script
 
-Starting with version 26.2, this project ships an [`scripts/upgrade-apex.sh`](https://github.com/United-Codes/uc-local-apex-dev/blob/main/scripts/upgrade-apex.sh) script that automates downloading the latest APEX, running the installer, copying the images, and reapplying the `INTERNAL` workspace settings (extended session timeout, ACLs, etc.).
+Starting with version 26.2, this project ships a `scripts/upgrade-apex.sh` script that automates downloading the latest APEX, running the installer, copying the images, and reapplying the `INTERNAL` workspace settings (extended session timeout, ACLs, etc.).
 
 ```sh
 ./scripts/upgrade-apex.sh
@@ -34,7 +34,7 @@ sql -name local-23ai-sys @apexins.sql TBS_APEX TBS_APEX TEMP /i/
 exit;
 ```
 
-(If your are still on 23ai use `SYSAUX` instead)
+(If you are still on 23ai use `SYSAUX` instead)
 
 ```sh
 cd apex
@@ -50,4 +50,4 @@ rm -rf ./apex-images || true
 cp -r ./apex/images ./apex-images
 ```
 
-If you get an popup error saying your files our outdated, you need to clear your browser cache.
+If you get a popup error saying your files are outdated, you need to clear your browser cache.

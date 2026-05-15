@@ -74,7 +74,7 @@ docker-compose up -d
 
 ### 4. Wait until DB and ORDS are ready
 
-First wait untull the docker containers are running:
+First wait until the docker containers are running:
 
 ```bash
 docker-compose up -d
@@ -103,7 +103,7 @@ This can take 1 to 2 minutes depending on your system performance. You can follo
 
 Optionally [set up local SSL/HTTPS](/products/uc-local-apex-dev/docs/getting-started/common-tasks/#ssl-configuration) for ORDS.
 
-If you want to save diskspace you can remove the `apex` directory:
+If you want to save disk space you can remove the `apex` directory:
 
 ```bash
 rm -rf ./apex
@@ -118,7 +118,7 @@ docker-compose restart ords-26ai
 If you wait until http://localhost:8181/ords loads successfully, you should now see the APEX module loaded.
 Click go or go to http://localhost:8181/ords/apex to login.
 
-If you get an error messsage saying "Account Is Locked" run the following:
+If you get an error message saying "Account Is Locked" run the following:
 
 ```sh
 ./scripts/unexpire-accounts.sh
