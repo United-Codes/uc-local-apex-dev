@@ -10,7 +10,15 @@ echo "Downloading APEX"
 rm -rf ./apex || true
 rm -rf ./apex-images || true
 
-wget https://download.oracle.com/otn_software/apex/apex-latest.zip
+APEX_URL="https://download.oracle.com/otn_software/apex/apex-latest.zip"
+if command -v curl >/dev/null 2>&1; then
+  curl -fLO "$APEX_URL"
+elif command -v wget >/dev/null 2>&1; then
+  wget "$APEX_URL"
+else
+  echo "Error: neither curl nor wget is installed. Please install one of them and re-run." >&2
+  exit 1
+fi
 unzip apex-latest.zip
 rm apex-latest.zip
 rm -rf ./META-INF || true

@@ -20,7 +20,12 @@ Starting with version 26.2, this project ships a `scripts/upgrade-apex.sh` scrip
 ### Download and unzip latest APEX version
 
 ```sh
+# Using curl (pre-installed on macOS):
+curl -fLO https://download.oracle.com/otn_software/apex/apex-latest.zip
+
+# Or using wget:
 wget https://download.oracle.com/otn_software/apex/apex-latest.zip
+
 unzip apex-latest.zip
 rm apex-latest.zip
 rm -rf ./META-INF || true
