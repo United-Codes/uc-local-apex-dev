@@ -27,7 +27,8 @@ SQL
 cd ..
 
 echo "Configure APEX images"
-cp -r ./apex/images/ ./apex-images/
+mkdir -p ./apex-images
+cp -R ./apex/images/. ./apex-images/
 
 echo "Configuring INTERNAL workspace settings"
 
