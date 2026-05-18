@@ -2,6 +2,29 @@
 
 set -e
 
+# --- Check for required non-default commands ---
+MISSING_CMDS=()
+
+for cmd in sql docker unzip; do
+  if ! command -v "$cmd" &>/dev/null; then
+    MISSING_CMDS+=("$cmd")
+  fi
+done
+
+# At least one of curl or wget is required (for APEX download)
+if ! command -v curl &>/dev/null && ! command -v wget &>/dev/null; then
+  MISSING_CMDS+=("curl or wget")
+fi
+
+if [ ${#MISSING_CMDS[@]} -gt 0 ]; then
+  echo "ERROR: The following required commands are missing:" >&2
+  for cmd in "${MISSING_CMDS[@]}"; do
+    echo "  - $cmd" >&2
+  done
+  exit 1
+fi
+# --- End command check ---
+
 source ./scripts/util/load_env.sh
 source ./scripts/util/get_ws_settings.sh
 
