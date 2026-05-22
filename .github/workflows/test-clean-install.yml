@@ -43,12 +43,12 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Install sqlv and SQLcl 25.4
+      - name: Install sqlv and SQLcl 26.1.2
         run: |
           set -euo pipefail
           curl -fsSL https://raw.githubusercontent.com/United-Codes/sqlv/main/install.sh | bash
           export PATH="$HOME/sqlv/bin:$HOME/sqlv/current/bin:$PATH"
-          sqlv install 25.4
+          sqlv install 26.1.2
           # Persist PATH for later steps
           echo "$HOME/sqlv/bin" >> "$GITHUB_PATH"
           echo "$HOME/sqlv/current/bin" >> "$GITHUB_PATH"
