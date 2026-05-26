@@ -83,7 +83,7 @@ Equally you can stop it with:
 podman machine stop
 ```
 
-But I recomment stopping the database before stopping the Podman machine:
+But I recommend stopping the database before stopping the Podman machine:
 
 ```sh
 local-23ai.sh stop

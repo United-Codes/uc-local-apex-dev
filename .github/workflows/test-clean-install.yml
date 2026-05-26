@@ -6,8 +6,8 @@ on:
     branches:
       - main
       - master
-      - '25-*'
-      - '26-*'
+      - "25-*"
+      - "26-*"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -41,14 +41,14 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: "17"
 
-      - name: Install sqlv and SQLcl 25.4
+      - name: Install sqlv and SQLcl 26.1.2
         run: |
           set -euo pipefail
           curl -fsSL https://raw.githubusercontent.com/United-Codes/sqlv/main/install.sh | bash
           export PATH="$HOME/sqlv/bin:$HOME/sqlv/current/bin:$PATH"
-          sqlv install 25.4
+          sqlv install 26.1.2
           # Persist PATH for later steps
           echo "$HOME/sqlv/bin" >> "$GITHUB_PATH"
           echo "$HOME/sqlv/current/bin" >> "$GITHUB_PATH"
@@ -115,6 +115,17 @@ jobs:
       # is picked. The later archive-logs prompt is already TTY-guarded.
       - name: Run after-first-db-start (installs APEX)
         run: printf '\n' | ./scripts/after-first-db-start.sh
+
+      - name: Verify apex-images folder layout
+        run: |
+          set -euo pipefail
+          # Regression guard: a previous user hit `cp` nesting the source
+          # folder into the destination (./apex-images/images/...). The
+          # contents must live at the top of ./apex-images/ instead.
+          test -f ./apex-images/apex_version.txt
+          test -d ./apex-images/libraries
+          test -d ./apex-images/themes
+          test ! -e ./apex-images/images
 
       - name: Smoke test
         run: |

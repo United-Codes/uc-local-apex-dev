@@ -2,6 +2,29 @@
 
 set -e
 
+# --- Check for required non-default commands ---
+MISSING_CMDS=()
+
+for cmd in sql docker unzip; do
+  if ! command -v "$cmd" &>/dev/null; then
+    MISSING_CMDS+=("$cmd")
+  fi
+done
+
+# At least one of curl or wget is required (for APEX download)
+if ! command -v curl &>/dev/null && ! command -v wget &>/dev/null; then
+  MISSING_CMDS+=("curl or wget")
+fi
+
+if [ ${#MISSING_CMDS[@]} -gt 0 ]; then
+  echo "ERROR: The following required commands are missing:" >&2
+  for cmd in "${MISSING_CMDS[@]}"; do
+    echo "  - $cmd" >&2
+  done
+  exit 1
+fi
+# --- End command check ---
+
 source ./scripts/util/load_env.sh
 source ./scripts/util/get_ws_settings.sh
 
@@ -74,6 +97,10 @@ SQL
 read -r -p "Enter the APEX Internal ADMIN password [Welcome_1]: " ADMIN_PWD
 ADMIN_PWD=${ADMIN_PWD:-Welcome_1}
 echo "Changing Internal ADMIN password to $ADMIN_PWD"
+if [ ! -f ./apex/apxchpwd.sql ]; then
+  echo "ERROR: ./apex/apxchpwd.sql not found — APEX install may not have completed." >&2
+  exit 1
+fi
 echo -e "ADMIN\nADMIN\n$ADMIN_PWD" | sql -name "$DB_CONN_NAME" @apex/apxchpwd.sql
 
 ./scripts/sync-backups-folder.sh
