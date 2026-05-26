@@ -4,6 +4,7 @@ oradata_old
 ords-config
 ords-secrets
 .env
+.env.bak
 .env_old
 .env.ords
 **/cert.crt
@@ -12,3 +13,4 @@ apex/**/*
 META-INF/**/*
 apex-images
 install_*.log
+.fetch-client/

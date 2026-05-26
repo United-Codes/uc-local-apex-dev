@@ -40,6 +40,12 @@ BEGIN
            continue;
         end if;
         --
+        if cur_rec.object_type = 'SCHEDULE'
+        then
+          execute IMMEDIATE 'begin sys.dbms_scheduler.drop_schedule (schedule_name => '''||cur_rec.object_name||''', force => true); end;';
+          continue;
+        end if;
+        --
         IF cur_rec.object_type = 'TABLE' THEN
           l_cascade := ' CASCADE CONSTRAINTS';
         END IF;
