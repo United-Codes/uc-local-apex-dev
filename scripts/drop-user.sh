@@ -22,9 +22,16 @@ if [[ $answer == "y" ]] || [[ $answer == "Y" ]]; then
 
   sql -name $DB_CONN_NAME <<SQL
     select user from dual;
-
+    set serveroutput on size 1000000 format wrapped
+    declare
+       e_no_workspace exception;
+       pragma exception_init (e_no_workspace, -20987);
     begin
       APEX_INSTANCE_ADMIN.REMOVE_WORKSPACE('${USERNAME_UPPER}');
+    exception
+      when e_no_workspace
+      then
+        sys.dbms_output.put_line ('No Workspace to be removed');
     end;
     /
 
