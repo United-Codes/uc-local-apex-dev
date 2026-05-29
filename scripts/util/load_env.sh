@@ -24,12 +24,12 @@ sql() {
 }
 export -f sql
 
-# Detect docker compose command (standalone vs plugin)
-if command -v docker-compose &>/dev/null; then
-  DOCKER_COMPOSE="docker-compose"
-elif docker compose version &>/dev/null 2>&1; then
+# Detect docker compose command (prefer v2 plugin, fall back to standalone v1)
+if docker compose version &>/dev/null 2>&1; then
   DOCKER_COMPOSE="docker compose"
+elif command -v docker-compose &>/dev/null; then
+  DOCKER_COMPOSE="docker-compose"
 else
-  echo "Error: neither 'docker-compose' nor 'docker compose' found"
+  echo "Error: neither 'docker compose' nor 'docker-compose' found"
   exit 1
 fi
