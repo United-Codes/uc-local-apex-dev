@@ -10,6 +10,20 @@ export $(grep -v '^#' .env | xargs)
 
 echo "loaded .env file"
 
+# Wrap SQLcl so non-interactive (heredoc/pipe) calls don't fail with
+# "Unable to create a terminal". JLine can't allocate a real terminal when
+# stdin isn't a TTY (varies by SQLcl/JLine version); TERM=dumb makes it fall
+# back silently. Interactive sessions keep their real TERM so line editing,
+# history and colors still work.
+sql() {
+  if [ -t 0 ]; then
+    command sql "$@"
+  else
+    TERM=dumb command sql "$@"
+  fi
+}
+export -f sql
+
 # Detect docker compose command (standalone vs plugin)
 if command -v docker-compose &>/dev/null; then
   DOCKER_COMPOSE="docker-compose"
