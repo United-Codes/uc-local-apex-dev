@@ -18,6 +18,12 @@ EXIT;
 SQL
   )
 
+  # SQLcl output can include whitespace/banner lines or land on a stream we
+  # don't capture (varies by SQLcl version and TERM); keep only the first
+  # integer and default to 0 so the numeric test below never breaks.
+  count=$(printf '%s' "$count" | grep -Eo '[0-9]+' | head -n1)
+  count=${count:-0}
+
   if [ "$count" -gt 0 ]; then
     return 0 # true in bash
   else
