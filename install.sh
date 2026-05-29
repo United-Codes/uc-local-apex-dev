@@ -1,0 +1,191 @@
+#!/usr/bin/env bash
+#
+# One-shot installer for uc-local-apex-dev.
+#
+# Runs setup.sh, pulls the container images, brings the stack up, waits for
+# the database and ORDS to become ready, then invokes
+# scripts/after-first-db-start.sh non-interactively (so the archive-logs
+# prompt picks its default of "disable").
+#
+# Re-running on an already-installed checkout is safe: setup.sh is skipped
+# if .env already has all the keys we need, and the readiness loops return
+# immediately when the stack is already up.
+
+set -euo pipefail
+
+CURRENT_STEP="startup"
+trap 'echo "::error::install.sh failed during step: $CURRENT_STEP" >&2' ERR
+
+cd "$(dirname "${BASH_SOURCE[0]}")"
+
+banner() {
+  CURRENT_STEP="$1"
+  echo
+  echo "=== $1 ==="
+}
+
+# ---------------------------------------------------------------------------
+# 1. Preflight checks
+# ---------------------------------------------------------------------------
+banner "Preflight checks"
+
+MISSING=()
+
+for cmd in docker sql unzip; do
+  if ! command -v "$cmd" &>/dev/null; then
+    MISSING+=("$cmd")
+  fi
+done
+
+if ! command -v curl &>/dev/null && ! command -v wget &>/dev/null; then
+  MISSING+=("curl or wget")
+fi
+
+# Prefer docker compose v2 plugin, fall back to standalone v1.
+if docker compose version &>/dev/null 2>&1; then
+  DOCKER_COMPOSE="docker compose"
+elif command -v docker-compose &>/dev/null; then
+  DOCKER_COMPOSE="docker-compose"
+else
+  MISSING+=("docker compose (v2 plugin or v1 standalone)")
+fi
+
+if [ ${#MISSING[@]} -gt 0 ]; then
+  echo "ERROR: required tools are missing:" >&2
+  for cmd in "${MISSING[@]}"; do
+    echo "  - $cmd" >&2
+  done
+  exit 1
+fi
+
+echo "Using compose command: $DOCKER_COMPOSE"
+
+# ---------------------------------------------------------------------------
+# 2. .env handling
+# ---------------------------------------------------------------------------
+banner "Prepare .env"
+
+REQUIRED_ENV_KEYS=(
+  ORACLE_PASSWORD
+  ORACLE_PWD
+  DB_CONN_BASE
+  DB_CONN_NAME
+  CONTAINER_NAME
+  DBSERVICENAME
+  DBHOST
+  DBPORT
+  FORCE_SECURE
+)
+
+if [ -f .env ]; then
+  echo ".env already exists — validating required keys."
+  missing_keys=()
+  for key in "${REQUIRED_ENV_KEYS[@]}"; do
+    if ! grep -qE "^${key}=" .env; then
+      missing_keys+=("$key")
+    fi
+  done
+  if [ ${#missing_keys[@]} -gt 0 ]; then
+    echo "ERROR: .env is missing required keys:" >&2
+    for key in "${missing_keys[@]}"; do
+      echo "  - $key" >&2
+    done
+    echo "Remove or fix .env and re-run ./install.sh" >&2
+    exit 1
+  fi
+  echo ".env looks good — reusing existing passwords."
+else
+  echo "No .env found — running setup.sh."
+  ./setup.sh
+fi
+
+# Pull in $ORACLE_PASSWORD, the sql() TTY wrapper, and (again) $DOCKER_COMPOSE.
+# load_env.sh re-detects compose, which is fine — same result.
+# shellcheck disable=SC1091
+source ./scripts/util/load_env.sh
+
+# ---------------------------------------------------------------------------
+# 3. Pull images
+# ---------------------------------------------------------------------------
+banner "Pull container images"
+$DOCKER_COMPOSE pull
+
+# ---------------------------------------------------------------------------
+# 4. Start the stack
+# ---------------------------------------------------------------------------
+banner "Start the stack"
+$DOCKER_COMPOSE up -d
+
+# ---------------------------------------------------------------------------
+# 5. Wait for the database to be ready
+# ---------------------------------------------------------------------------
+banner "Wait for database to be ready (up to 25 minutes)"
+deadline=$((SECONDS + 1500))
+db_ready=false
+while (( SECONDS < deadline )); do
+  if $DOCKER_COMPOSE logs 26ai 2>&1 | grep -q "DATABASE IS READY TO USE!"; then
+    echo "Database is ready."
+    db_ready=true
+    break
+  fi
+  sleep 10
+done
+
+if [ "$db_ready" != true ]; then
+  echo "ERROR: database did not become ready within 25 minutes" >&2
+  $DOCKER_COMPOSE logs 26ai | tail -100 >&2 || true
+  exit 1
+fi
+
+# ---------------------------------------------------------------------------
+# 6. Wait for ORDS to finish its first-boot install
+# ---------------------------------------------------------------------------
+banner "Wait for ORDS to be ready (up to 15 minutes)"
+deadline=$((SECONDS + 900))
+ords_ready=false
+while (( SECONDS < deadline )); do
+  count=$(sql -S "sys/${ORACLE_PASSWORD}@localhost:1521/FREEPDB1" as SYSDBA <<'SQL' 2>/dev/null | tr -d '[:space:]' || true
+set heading off feedback off pagesize 0
+select count(*) from dba_synonyms
+ where owner = 'PUBLIC' and synonym_name = 'ORDS';
+exit
+SQL
+  )
+  if [ "$count" = "1" ]; then
+    echo "ORDS is ready."
+    ords_ready=true
+    break
+  fi
+  sleep 10
+done
+
+if [ "$ords_ready" != true ]; then
+  echo "ERROR: ORDS did not finish installing within 15 minutes" >&2
+  $DOCKER_COMPOSE logs ords-26ai | tail -100 >&2 || true
+  exit 1
+fi
+
+# ---------------------------------------------------------------------------
+# 7. Run after-first-db-start.sh non-interactively
+# ---------------------------------------------------------------------------
+banner "Run after-first-db-start.sh (installs APEX, applies space optimizations)"
+# Closing stdin makes the archive-logs prompt take its default (Y, disable).
+# The APEX ADMIN password is no longer prompted — it reuses ORACLE_PASSWORD.
+./scripts/after-first-db-start.sh </dev/null
+
+# ---------------------------------------------------------------------------
+# 8. Final summary
+# ---------------------------------------------------------------------------
+banner "Done"
+cat <<EOF
+The stack is up and APEX is installed.
+
+  APEX:           https://localhost:8443/ords/
+  APEX workspace: INTERNAL / ADMIN / (your ORACLE_PASSWORD from .env)
+  SYS connection: sql -name "\$DB_CONN_NAME"   (after sourcing scripts/util/load_env.sh)
+
+Next: create a workspace + schema for your app:
+
+  ./scripts/create-user.sh <NAME>
+
+EOF

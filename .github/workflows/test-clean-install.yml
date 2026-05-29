@@ -54,67 +54,12 @@ jobs:
           echo "$HOME/sqlv/current/bin" >> "$GITHUB_PATH"
           sql -V
 
-      - name: Generate .env
-        run: ./setup.sh
-
-      - name: Pull container images
-        run: docker compose pull
-
-      # The Oracle Free image ships its own HEALTHCHECK in the Dockerfile,
-      # so `depends_on: service_healthy` works and ORDS will wait for the
-      # DB on its own.
-      - name: Start full stack (DB + ORDS)
-        run: docker compose up -d
-
-      - name: Wait for database to be ready
-        run: |
-          set -euo pipefail
-          deadline=$((SECONDS + 1500))
-          while (( SECONDS < deadline )); do
-            if docker compose logs 26ai 2>&1 | grep -q "DATABASE IS READY TO USE!"; then
-              echo "Database is ready."
-              exit 0
-            fi
-            sleep 10
-          done
-          echo "::error::Database did not become ready within 25 minutes"
-          docker compose logs 26ai
-          exit 1
-
-      # ORDS installs its DB-side schema (ORDS_METADATA + the public ORDS
-      # synonym) on first boot. create-user.sh calls ords.enable_schema, so
-      # we have to wait for that package to be in place before any user
-      # script runs.
-      - name: Wait for ORDS to be ready
-        run: |
-          set -euo pipefail
-          # shellcheck disable=SC1091
-          source ./scripts/util/load_env.sh
-
-          deadline=$((SECONDS + 900))
-          while (( SECONDS < deadline )); do
-            count=$(sql -S "sys/${ORACLE_PASSWORD}@localhost:1521/FREEPDB1" as SYSDBA <<'SQL' | tr -d '[:space:]'
-          set heading off feedback off pagesize 0
-          select count(*) from dba_synonyms
-           where owner = 'PUBLIC' and synonym_name = 'ORDS';
-          exit
-          SQL
-          )
-            if [ "$count" = "1" ]; then
-              echo "ORDS is ready."
-              exit 0
-            fi
-            sleep 10
-          done
-          echo "::error::ORDS did not finish installing within 15 minutes"
-          docker compose logs ords-26ai
-          exit 1
-
-      # after-first-db-start.sh has one un-guarded `read` for the APEX
-      # ADMIN password. Feed it a single newline so the default (Welcome_1)
-      # is picked. The later archive-logs prompt is already TTY-guarded.
-      - name: Run after-first-db-start (installs APEX)
-        run: printf '\n' | ./scripts/after-first-db-start.sh
+      # install.sh is the one-shot installer end users run: it generates
+      # .env via setup.sh, pulls images, brings the stack up, waits for the
+      # DB and ORDS, and runs after-first-db-start.sh with safe defaults.
+      # Running it here also serves as its regression test.
+      - name: Run install.sh
+        run: ./install.sh
 
       - name: Verify apex-images folder layout
         run: |
