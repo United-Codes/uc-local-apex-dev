@@ -77,14 +77,19 @@ jobs:
           set -euo pipefail
           # shellcheck disable=SC1091
           source ./scripts/util/load_env.sh
-          sql -name "$DB_CONN_NAME" <<'SQL'
+          # `apxchpwd.sql` is piped without `whenever sqlerror exit failure`,
+          # so an ORA-20001 from APEX password validation is silently swallowed
+          # and the ADMIN account ends up missing. Assert it actually exists.
+          sql -name "$DB_CONN_NAME" <<'SQL' | sed 's/[[:space:]]*$//' | tee smoke.out
           whenever sqlerror exit failure
-          set heading off feedback off
+          set heading off feedback off pagesize 0
           select 'db_version: ' || banner_full from v$version where rownum = 1;
           select 'apex_version: ' || version_no from apex_release;
           select 'workspace_count: ' || count(*) from apex_workspaces;
+          select 'apex_internal_admin=' || count(*) from apex_workspace_apex_users where user_name = 'ADMIN' and workspace_name = 'INTERNAL';
           exit
           SQL
+          grep -qx 'apex_internal_admin=1' smoke.out
 
       # -----------------------------------------------------------------
       # Script tests — exercise the user-facing scripts against the real

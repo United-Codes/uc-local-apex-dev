@@ -79,6 +79,16 @@ sql -name "$DB_CONN_NAME" <<SQL
     !';
     commit;
 
+    -- Relax the APEX site-admin password rule so the auto-generated
+    -- alphanumeric ORACLE_PASSWORD (used as the INTERNAL ADMIN password by
+    -- after-first-db-start.sh) is accepted by apxchpwd. This is a dev-only
+    -- environment.
+    execute IMMEDIATE ' update ' || l_username || q'!.wwv_flow_platform_prefs
+        set VALUE = 'N'
+      where NAME = 'STRONG_SITE_ADMIN_PASSWORD'
+    !';
+    commit;
+
     -- ACL to allow web service requests
     dbms_network_acl_admin.Append_host_ace(
       host => '*',
