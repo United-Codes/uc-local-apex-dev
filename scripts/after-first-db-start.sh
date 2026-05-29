@@ -94,9 +94,8 @@ SQL
 
 ./scripts/upgrade-apex.sh
 
-read -r -p "Enter the APEX Internal ADMIN password [Welcome_1]: " ADMIN_PWD
-ADMIN_PWD=${ADMIN_PWD:-Welcome_1}
-echo "Changing Internal ADMIN password to $ADMIN_PWD"
+ADMIN_PWD=$ORACLE_PASSWORD
+echo "Setting the APEX Internal ADMIN password to the ORACLE_PASSWORD from .env (reused)"
 if [ ! -f ./apex/apxchpwd.sql ]; then
   echo "ERROR: ./apex/apxchpwd.sql not found — APEX install may not have completed." >&2
   exit 1
