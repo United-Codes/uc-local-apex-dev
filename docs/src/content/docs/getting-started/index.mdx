@@ -59,80 +59,55 @@ cd uc-local-apex-dev
 ### 2. Make Scripts Executable
 
 ```bash
-chmod +x ./local-26ai.sh ./setup.sh ./scripts/*.sh
+chmod +x ./install.sh ./local-26ai.sh ./setup.sh ./scripts/*.sh
 ```
 
-### 3. Run Setup
+### 3. Run the Installer
 
 ```bash
-# Setup the environment
-./setup.sh
-
-# Start the containers (use podman-compose if using Podman)
-docker-compose up -d
+./install.sh
 ```
 
-### 4. Wait until DB and ORDS are ready
+`install.sh` is a one-shot installer that does the full bootstrap end-to-end:
 
-First wait until the docker containers are running:
+1. Checks that `docker`, `docker compose` (v2 or v1), `sql` (SQLcl), `unzip` and `curl`/`wget` are on your `PATH`.
+2. Runs `./setup.sh` to generate `.env` with a random Oracle SYS password (skipped if `.env` already exists and contains all required keys).
+3. Pulls the DB + ORDS container images.
+4. Starts the stack with `docker compose up -d`.
+5. Waits for the database to be ready (up to 25 min) and for ORDS to finish its first-boot install (up to 15 min).
+6. Sets the ORDS PL/SQL gateway mode to `proxied` (the recommended setting for APEX).
+7. Runs `./scripts/after-first-db-start.sh` non-interactively — installs APEX, applies dev-friendly defaults (disables archive logs, relaxes APEX password rules), and sets the APEX `INTERNAL`/`ADMIN` password to the same `ORACLE_PASSWORD` value from `.env`.
+8. Restarts the ORDS container so it picks up the new APEX module + config change, and waits for it to come back.
 
-```bash
-docker-compose up -d
-[+] Running 4/4
- ✔ Network uc-local-apex-dev_default Created
- ✔ Volume "oradata-26ai"             Created
- ✔ Container local-26ai              Healthy
- ✔ Container local-26ai-ords         Started
-```
+The whole flow takes roughly 15–20 minutes on a typical machine, mostly waiting on the Oracle DB to come up. When it finishes you'll see a `=== Done ===` banner with the next steps.
 
-Then run this command to change the ORDS to use the proxied PL/SQL gateway mode:
+<Aside type="tip" title="Re-running install.sh">
+`install.sh` is safe to re-run. If `.env` already exists and is complete, it's reused (no password rotation) and the readiness loops return immediately when the stack is already up.
+</Aside>
 
-```sh
-docker exec -it local-26ai-ords bash -c \
-"ords --config /etc/ords/config config --db-pool default set plsql.gateway.mode proxied"
-```
+### 4. Log into APEX
 
-Wait till http://localhost:8181/ords loads successfully in your browser. You should see the ORDS landing page.
-This can take 1 to 2 minutes depending on your system performance. You can follow the logs via `docker-compose logs --follow`.
+Visit http://localhost:8181/ords/apex to log in. `install.sh` already set `ords --config /etc/ords/config config --db-pool default set plsql.gateway.mode proxied` and restarted ORDS so APEX is ready.
 
-### 5. Install APEX and configure DB
-
-```bash
-./scripts/after-first-db-start.sh
-```
-
-Optionally [set up local SSL/HTTPS](/products/uc-local-apex-dev/docs/getting-started/common-tasks/#ssl-configuration) for ORDS.
-
-If you want to save disk space you can remove the `apex` directory:
-
-```bash
-rm -rf ./apex
-```
-
-### 6. Restart ORDS
-
-```bash
-docker-compose restart ords-26ai
-```
-
-If you wait until http://localhost:8181/ords loads successfully, you should now see the APEX module loaded.
-Click go or go to http://localhost:8181/ords/apex to login.
-
-If you get an error message saying "Account Is Locked" run the following:
+If you get an "Account Is Locked" message:
 
 ```sh
 ./scripts/unexpire-accounts.sh
 ```
 
-You can now reload the APEX page at http://localhost:8181/ords/apex and should see no more error messages.
-
-If you don't want APEX to force you to change passwords, you can also run the disable password expiration script:
+If you don't want APEX to force you to change passwords:
 
 ```sh
 ./scripts/disable-password-expiration.sh
 ```
 
-### 7. PATH Configuration
+Optionally [set up local SSL/HTTPS](/products/uc-local-apex-dev/docs/getting-started/common-tasks/#ssl-configuration) for ORDS, or save disk space by removing the `apex` install folder:
+
+```bash
+rm -rf ./apex
+```
+
+### 5. PATH Configuration
 
 For easier script access, add the repository to your PATH:
 
@@ -171,5 +146,5 @@ Once setup is complete, you can access:
 
 ### Default APEX Credentials
 
-- **Username**: admin or the schema/workspace name you created
-- **Password**: Welcome_1
+- **INTERNAL workspace**: `ADMIN` / value of `ORACLE_PASSWORD` in `.env`
+- **Your own workspaces**: schema/workspace name from `./scripts/create-user.sh <NAME>` / matching `<NAME>_USER_PASSWORD` in `.env`

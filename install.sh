@@ -166,7 +166,17 @@ if [ "$ords_ready" != true ]; then
 fi
 
 # ---------------------------------------------------------------------------
-# 7. Run after-first-db-start.sh non-interactively
+# 7. Configure ORDS pl/sql gateway mode = proxied
+# ---------------------------------------------------------------------------
+# `proxied` is the default in ORDS 26.x but older images (and explicit configs)
+# may pick `direct`. Setting it explicitly keeps the APEX URL working with
+# workspace-level proxy auth in all cases. The command is idempotent.
+banner "Configure ORDS plsql.gateway.mode = proxied"
+docker exec local-26ai-ords bash -c \
+  "ords --config /etc/ords/config config --db-pool default set plsql.gateway.mode proxied"
+
+# ---------------------------------------------------------------------------
+# 8. Run after-first-db-start.sh non-interactively
 # ---------------------------------------------------------------------------
 banner "Run after-first-db-start.sh (installs APEX, applies space optimizations)"
 # Closing stdin makes the archive-logs prompt take its default (Y, disable).
@@ -174,7 +184,24 @@ banner "Run after-first-db-start.sh (installs APEX, applies space optimizations)
 ./scripts/after-first-db-start.sh </dev/null
 
 # ---------------------------------------------------------------------------
-# 8. Final summary
+# 9. Restart ORDS so it picks up APEX + the config change
+# ---------------------------------------------------------------------------
+banner "Restart ORDS to pick up APEX module"
+$DOCKER_COMPOSE restart ords-26ai
+# Wait for ORDS to come back so callers (and CI) can immediately use it.
+deadline=$((SECONDS + 180))
+while (( SECONDS < deadline )); do
+  if docker exec local-26ai-ords bash -c \
+       "curl -fsS -o /dev/null -w '%{http_code}' http://localhost:8080/ords/" \
+       2>/dev/null | grep -qE '^(200|30[0-9])$'; then
+    echo "ORDS is back."
+    break
+  fi
+  sleep 5
+done
+
+# ---------------------------------------------------------------------------
+# 10. Final summary
 # ---------------------------------------------------------------------------
 banner "Done"
 cat <<EOF
