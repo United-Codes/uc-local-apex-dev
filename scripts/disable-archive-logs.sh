@@ -7,7 +7,7 @@ set -e
 source ./scripts/util/load_env.sh
 
 echo "Disabling archive logs"
-docker exec "$CONTAINER_NAME" bash -c "sqlplus -S / as sysdba <<EOF
+$CONTAINER_CLI exec "$CONTAINER_NAME" bash -c "sqlplus -S / as sysdba <<EOF
 shutdown immediate;
 startup mount;
 alter database noarchivelog;
@@ -17,4 +17,4 @@ exit;
 EOF"
 
 echo "Removing archive logs"
-docker exec "$CONTAINER_NAME" bash -c "cd /opt/oracle/product/26ai/dbhomeFree/dbs && rm arch1*.dbf"
+$CONTAINER_CLI exec "$CONTAINER_NAME" bash -c "cd /opt/oracle/product/26ai/dbhomeFree/dbs && rm arch1*.dbf"

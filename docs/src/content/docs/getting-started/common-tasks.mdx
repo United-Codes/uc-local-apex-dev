@@ -9,6 +9,10 @@ import { Aside } from "@astrojs/starlight/components";
 
 Once your environment is set up, these are the most common tasks you'll perform during APEX development.
 
+<Aside type="note" title="Docker or Podman">
+The commands below that call `docker compose` work with Podman too — just substitute `podman compose`. The project's own scripts (`local-26ai.sh`, `./scripts/*.sh`) auto-detect the engine, so you don't need to change anything when running those.
+</Aside>
+
 ## Managing Containers
 
 ### Start/Stop Containers
@@ -17,11 +21,11 @@ Once your environment is set up, these are the most common tasks you'll perform 
 # Stop database
 local-26ai.sh stop
 # You could also run this, but the script will gracefully stop the database
-# docker-compose stop
+# docker compose stop   (or: podman compose stop)
 
 local-26ai.sh start
 # Or
-# docker-compose start
+# docker compose start  (or: podman compose start)
 ```
 
 ## ORDS Configuration
@@ -32,7 +36,7 @@ The `ords-config` folder in the root directory contains ORDS configuration files
 
 ```bash
 # After modifying config files
-docker-compose restart ords
+docker compose restart ords-26ai   # or: podman compose restart ords-26ai
 ```
 
 ### SSL Configuration
@@ -41,7 +45,7 @@ Enable HTTPS for ORDS by creating self-signed certificates. On MacOS and Linux i
 
 ```bash
 sudo ./scripts/create-self-signed-certificates.sh
-docker-compose restart ords
+docker compose restart ords-26ai   # or: podman compose restart ords-26ai
 ```
 
 Access via: https://localhost:8443/ords (Port 8443 instead of 8181).
@@ -140,8 +144,8 @@ This script updates all export files in `./backups/import/` to remove problemati
 To start completely fresh (⚠️ **ALL DATA WILL BE LOST**):
 
 ```bash
-docker-compose down
-docker volume rm oradata
+docker compose down        # or: podman compose down
+docker volume rm oradata-26ai   # or: podman volume rm oradata-26ai
 rm .env
 ```
 

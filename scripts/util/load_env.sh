@@ -24,12 +24,27 @@ sql() {
 }
 export -f sql
 
-# Detect docker compose command (prefer v2 plugin, fall back to standalone v1)
-if docker compose version &>/dev/null 2>&1; then
-  DOCKER_COMPOSE="docker compose"
-elif command -v docker-compose &>/dev/null; then
-  DOCKER_COMPOSE="docker-compose"
+# Detect container engine (honor a pre-set CONTAINER_CLI, else prefer docker, fall back to podman)
+if [ -n "${CONTAINER_CLI:-}" ]; then
+  :
+elif command -v docker &>/dev/null; then
+  CONTAINER_CLI="docker"
+elif command -v podman &>/dev/null; then
+  CONTAINER_CLI="podman"
 else
-  echo "Error: neither 'docker compose' nor 'docker-compose' found"
+  echo "Error: neither 'docker' nor 'podman' found"
   exit 1
 fi
+
+# Detect its compose command. Use the native 'compose' subcommand; for docker keep the
+# legacy 'docker-compose' v1 fallback. Podman uses ONLY 'podman compose' (no podman-compose).
+if $CONTAINER_CLI compose version &>/dev/null 2>&1; then
+  DOCKER_COMPOSE="$CONTAINER_CLI compose"
+elif [ "$CONTAINER_CLI" = "docker" ] && command -v docker-compose &>/dev/null; then
+  DOCKER_COMPOSE="docker-compose"
+else
+  echo "Error: no compose command found for '$CONTAINER_CLI' (podman needs the native 'podman compose' subcommand)"
+  exit 1
+fi
+
+export CONTAINER_CLI DOCKER_COMPOSE

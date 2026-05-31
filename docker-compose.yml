@@ -26,9 +26,13 @@ services:
       - type: bind
         source: ords-config
         target: /etc/ords/config
+        bind:
+          selinux: z
       - type: bind
         source: apex-images
         target: /opt/oracle/apex/images
+        bind:
+          selinux: z
     restart: no
     env_file:
       - ./.env

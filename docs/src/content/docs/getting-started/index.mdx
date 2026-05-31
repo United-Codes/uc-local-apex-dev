@@ -15,10 +15,23 @@ Before you begin, make sure you have the following installed:
 
 ### Required Software
 
-- **Docker or Podman** (or any docker-compatible container runtime)
-- **docker-compose / podman-compose**
+- **Docker or Podman** — both are natively supported. The scripts auto-detect which engine is installed (preferring `docker` if both are present).
+- **Compose** — either `docker compose` (v2 plugin, or the legacy `docker-compose` v1) or the native `podman compose` subcommand.
 - **SQLcl** with "sql" command in PATH
 - **Bash-compatible shell**
+
+<Aside type="tip" title="Forcing the container engine">
+If you have both Docker and Podman installed and want to force one, set `CONTAINER_CLI` before running any script:
+
+```bash
+CONTAINER_CLI=podman ./install.sh
+```
+
+</Aside>
+
+<Aside type="note" title="Podman compose provider">
+On Podman we use the native `podman compose` subcommand (which delegates to a compose provider), not the standalone `podman-compose` — the latter doesn't support everything in this project's `docker-compose.yml`.
+</Aside>
 
 <Aside type="caution" title="Resource Requirements">
 Make sure your virtual machine has enough resources allocated. **The default Podman VM will cause issues with Oracle**.
@@ -70,10 +83,10 @@ chmod +x ./install.sh ./local-26ai.sh ./setup.sh ./scripts/*.sh
 
 `install.sh` is a one-shot installer that does the full bootstrap end-to-end:
 
-1. Checks that `docker`, `docker compose` (v2 or v1), `sql` (SQLcl), `unzip` and `curl`/`wget` are on your `PATH`.
+1. Checks that a container engine (`docker` or `podman`) with a compose command, `sql` (SQLcl), `unzip` and `curl`/`wget` are on your `PATH`.
 2. Runs `./setup.sh` to generate `.env` with a random Oracle SYS password (skipped if `.env` already exists and contains all required keys).
 3. Pulls the DB + ORDS container images.
-4. Starts the stack with `docker compose up -d`.
+4. Starts the stack with `<engine> compose up -d`.
 5. Waits for the database to be ready (up to 25 min) and for ORDS to finish its first-boot install (up to 15 min).
 6. Sets the ORDS PL/SQL gateway mode to `proxied` (the recommended setting for APEX).
 7. Runs `./scripts/after-first-db-start.sh` non-interactively — installs APEX, applies dev-friendly defaults (disables archive logs, relaxes APEX password rules), and sets the APEX `INTERNAL`/`ADMIN` password to the same `ORACLE_PASSWORD` value from `.env`.
