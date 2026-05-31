@@ -130,6 +130,11 @@ $DOCKER_COMPOSE pull
 # 4. Start the stack
 # ---------------------------------------------------------------------------
 banner "Start the stack"
+# These bind-mount sources are gitignored (empty on a fresh checkout). Create
+# them up front so the bind mounts attach cleanly on every engine — Docker used
+# to auto-create them, but with explicit bind options (selinux relabel) that
+# implicit behaviour is no longer guaranteed.
+mkdir -p ords-config apex-images
 $DOCKER_COMPOSE up -d
 
 # ---------------------------------------------------------------------------
