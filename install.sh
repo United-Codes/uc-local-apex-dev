@@ -31,7 +31,7 @@ banner "Preflight checks"
 
 MISSING=()
 
-for cmd in docker sql unzip; do
+for cmd in sql unzip; do
   if ! command -v "$cmd" &>/dev/null; then
     MISSING+=("$cmd")
   fi
@@ -41,13 +41,28 @@ if ! command -v curl &>/dev/null && ! command -v wget &>/dev/null; then
   MISSING+=("curl or wget")
 fi
 
-# Prefer docker compose v2 plugin, fall back to standalone v1.
-if docker compose version &>/dev/null 2>&1; then
-  DOCKER_COMPOSE="docker compose"
-elif command -v docker-compose &>/dev/null; then
+# Detect container engine (honor a pre-set CONTAINER_CLI, else prefer docker, fall back to podman).
+if [ -n "${CONTAINER_CLI:-}" ]; then
+  :
+elif command -v docker &>/dev/null; then
+  CONTAINER_CLI="docker"
+elif command -v podman &>/dev/null; then
+  CONTAINER_CLI="podman"
+else
+  CONTAINER_CLI=""
+  MISSING+=("docker or podman")
+fi
+
+# Detect its compose command. Native '<engine> compose'; docker keeps the legacy
+# 'docker-compose' v1 fallback. Podman uses ONLY 'podman compose' (no podman-compose).
+if [ -z "$CONTAINER_CLI" ]; then
+  :
+elif $CONTAINER_CLI compose version &>/dev/null 2>&1; then
+  DOCKER_COMPOSE="$CONTAINER_CLI compose"
+elif [ "$CONTAINER_CLI" = "docker" ] && command -v docker-compose &>/dev/null; then
   DOCKER_COMPOSE="docker-compose"
 else
-  MISSING+=("docker compose (v2 plugin or v1 standalone)")
+  MISSING+=("$CONTAINER_CLI compose (native compose subcommand)")
 fi
 
 if [ ${#MISSING[@]} -gt 0 ]; then
@@ -58,6 +73,7 @@ if [ ${#MISSING[@]} -gt 0 ]; then
   exit 1
 fi
 
+echo "Using container engine: $CONTAINER_CLI"
 echo "Using compose command: $DOCKER_COMPOSE"
 
 # ---------------------------------------------------------------------------
@@ -172,7 +188,7 @@ fi
 # may pick `direct`. Setting it explicitly keeps the APEX URL working with
 # workspace-level proxy auth in all cases. The command is idempotent.
 banner "Configure ORDS plsql.gateway.mode = proxied"
-docker exec local-26ai-ords bash -c \
+$CONTAINER_CLI exec local-26ai-ords bash -c \
   "ords --config /etc/ords/config config --db-pool default set plsql.gateway.mode proxied"
 
 # ---------------------------------------------------------------------------
@@ -191,7 +207,7 @@ $DOCKER_COMPOSE restart ords-26ai
 # Wait for ORDS to come back so callers (and CI) can immediately use it.
 deadline=$((SECONDS + 180))
 while (( SECONDS < deadline )); do
-  if docker exec local-26ai-ords bash -c \
+  if $CONTAINER_CLI exec local-26ai-ords bash -c \
        "curl -fsS -o /dev/null -w '%{http_code}' http://localhost:8080/ords/" \
        2>/dev/null | grep -qE '^(200|30[0-9])$'; then
     echo "ORDS is back."

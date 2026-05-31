@@ -5,7 +5,7 @@ if [ -t 0 ]; then
   DOCKER_IT_FLAGS="-it"
 fi
 
-docker exec -u oracle $DOCKER_IT_FLAGS "${CONTAINER_NAME}" bash -c 'cd /opt/oracle/oradata; mkdir -p datapump/import; mkdir -p datapump/export'
+"${CONTAINER_CLI:-docker}" exec -u oracle $DOCKER_IT_FLAGS "${CONTAINER_NAME}" bash -c 'cd /opt/oracle/oradata; mkdir -p datapump/import; mkdir -p datapump/export'
 
 sql -name "$DB_CONN_NAME" <<SQL
   select user from dual;

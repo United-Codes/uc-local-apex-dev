@@ -4,7 +4,7 @@ set -e
 
 source ./scripts/util/load_env.sh
 
-docker exec "$CONTAINER_NAME" bash -c "
+$CONTAINER_CLI exec "$CONTAINER_NAME" bash -c "
 \$ORACLE_HOME/perl/bin/perl \$ORACLE_HOME/rdbms/admin/catcon.pl \
   -u sys/$ORACLE_PASSWORD \
   --force_pdb_mode 'READ WRITE' \
@@ -41,16 +41,16 @@ if [ -t 0 ]; then
   DOCKER_IT_FLAGS="-it"
 fi
 
-docker exec -u oracle $DOCKER_IT_FLAGS "${CONTAINER_NAME}" bash -c 'cd /opt/oracle/oradata; mkdir -p wallets/ssl'
+$CONTAINER_CLI exec -u oracle $DOCKER_IT_FLAGS "${CONTAINER_NAME}" bash -c 'cd /opt/oracle/oradata; mkdir -p wallets/ssl'
 
 # copy certificates to wallet directory
-docker cp "$TEMP_DIR/." "${CONTAINER_NAME}:/opt/oracle/oradata/wallets/ssl/"
+$CONTAINER_CLI cp "$TEMP_DIR/." "${CONTAINER_NAME}:/opt/oracle/oradata/wallets/ssl/"
 
 # fix ownership
-docker exec -u root "${CONTAINER_NAME}" chown -R oracle:oinstall /opt/oracle/oradata/wallets/ssl/
+$CONTAINER_CLI exec -u root "${CONTAINER_NAME}" chown -R oracle:oinstall /opt/oracle/oradata/wallets/ssl/
 
 # add files to wallet
-docker exec -u oracle $DOCKER_IT_FLAGS "${CONTAINER_NAME}" bash -c "
+$CONTAINER_CLI exec -u oracle $DOCKER_IT_FLAGS "${CONTAINER_NAME}" bash -c "
 set -e
 
 cd /opt/oracle/oradata/wallets/ssl/

@@ -3,8 +3,8 @@ set -e
 source ./scripts/util/load_env.sh
 
 $DOCKER_COMPOSE stop || true
-docker rm $CONTAINER_NAME || true
-docker volume rm oradata || true
+$CONTAINER_CLI rm $CONTAINER_NAME || true
+$CONTAINER_CLI volume rm oradata || true
 
 if [ -f .env ]; then
   rm .env

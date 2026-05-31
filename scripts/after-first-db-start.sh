@@ -5,11 +5,18 @@ set -e
 # --- Check for required non-default commands ---
 MISSING_CMDS=()
 
-for cmd in sql docker unzip; do
+for cmd in sql unzip; do
   if ! command -v "$cmd" &>/dev/null; then
     MISSING_CMDS+=("$cmd")
   fi
 done
+
+# A container engine (docker or podman) is required.
+if [ -z "${CONTAINER_CLI:-}" ] \
+   && ! command -v docker &>/dev/null \
+   && ! command -v podman &>/dev/null; then
+  MISSING_CMDS+=("docker or podman")
+fi
 
 # At least one of curl or wget is required (for APEX download)
 if ! command -v curl &>/dev/null && ! command -v wget &>/dev/null; then

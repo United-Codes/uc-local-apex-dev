@@ -47,11 +47,23 @@ podman machine start
 # Please do so
 ```
 
-Now test if you can run podman via the docker command:
+Now test that podman works:
 
 ```sh
-docker ps
+podman ps
 ```
+
+The project's scripts (`install.sh`, `local-26ai.sh`, etc.) natively detect Podman — if `docker`
+isn't installed they automatically use `podman` and the native `podman compose` subcommand. You can
+run them as-is. If you have both Docker and Podman installed and want to force Podman, set
+`CONTAINER_CLI`:
+
+```sh
+CONTAINER_CLI=podman ./install.sh
+```
+
+If you'd rather route the scripts' `docker` usage through Podman's Docker-compatible socket instead,
+you can still do that — test it with `docker ps`.
 
 ## Troubleshooting
 
@@ -59,15 +71,17 @@ If this does not work please [follow this guide](https://podman-desktop.io/docs/
 
 If you have this file `~/.docker/config.json`, delete or rename it if you see this error: `error getting credentials - err: exec: "docker-credential-desktop": executable file not found in $PATH`.
 
-Alternatively, you can try using `podman` commands like:
+Alternatively, you can drive the stack directly with the native `podman compose` subcommand:
 
 ```sh
-podman-compose up -d
-podman-compose stop
+podman compose up -d
+podman compose stop
 podman ps
 # etc
 ```
-But podman-compose can cause some trouble in my experience.
+
+Use `podman compose` (the subcommand), not the standalone `podman-compose` package — the latter
+can cause trouble and doesn't support everything in this project's `docker-compose.yml`.
 
 ## After a restart
 
