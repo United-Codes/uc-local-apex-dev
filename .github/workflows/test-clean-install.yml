@@ -37,15 +37,22 @@ jobs:
       - uses: actions/checkout@v4
 
       # podman is preinstalled on ubuntu-latest, but `podman compose` delegates
-      # to an external provider. The docker compose v2 plugin already present on
-      # the runner serves as that provider — confirm the native subcommand works.
-      # We deliberately do NOT install podman-compose (it doesn't support the
-      # full compose spec this project's docker-compose.yml relies on).
-      - name: Verify native 'podman compose'
+      # to an external provider (the docker compose v2 plugin already on the
+      # runner). That provider talks to podman's Docker-compatible API socket as
+      # if it were a Docker daemon, so we must enable the rootless podman socket.
+      # enable-linger keeps the user's systemd manager (and the socket) alive
+      # across the separate `run:` steps. We deliberately do NOT install
+      # podman-compose (it doesn't support the full compose spec this project's
+      # docker-compose.yml relies on).
+      - name: Enable Podman API socket
         if: matrix.engine == 'podman'
         run: |
           set -euo pipefail
           podman --version
+          sudo loginctl enable-linger "$USER"
+          systemctl --user enable --now podman.socket
+          sock="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/podman/podman.sock"
+          test -S "$sock" && echo "podman socket listening at $sock"
           podman compose version
 
       # Oracle Free image (~9 GB) + oradata after apexins (~6 GB) does not

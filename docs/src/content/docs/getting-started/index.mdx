@@ -30,7 +30,9 @@ CONTAINER_CLI=podman ./install.sh
 </Aside>
 
 <Aside type="note" title="Podman compose provider">
-On Podman we use the native `podman compose` subcommand (which delegates to a compose provider), not the standalone `podman-compose` — the latter doesn't support everything in this project's `docker-compose.yml`.
+  On Podman we use the native `podman compose` subcommand (which delegates to a
+  compose provider), not the standalone `podman-compose` — the latter doesn't
+  support everything in this project's `docker-compose.yml`.
 </Aside>
 
 <Aside type="caution" title="Resource Requirements">
@@ -93,10 +95,6 @@ chmod +x ./install.sh ./local-26ai.sh ./setup.sh ./scripts/*.sh
 8. Restarts the ORDS container so it picks up the new APEX module + config change, and waits for it to come back.
 
 The whole flow takes roughly 15–20 minutes on a typical machine, mostly waiting on the Oracle DB to come up. When it finishes you'll see a `=== Done ===` banner with the next steps.
-
-<Aside type="tip" title="Re-running install.sh">
-`install.sh` is safe to re-run. If `.env` already exists and is complete, it's reused (no password rotation) and the readiness loops return immediately when the stack is already up.
-</Aside>
 
 ### 4. Log into APEX
 
