@@ -28,11 +28,13 @@ services:
         target: /etc/ords/config
         bind:
           selinux: z
+          create_host_path: true
       - type: bind
         source: apex-images
         target: /opt/oracle/apex/images
         bind:
           selinux: z
+          create_host_path: true
     restart: no
     env_file:
       - ./.env
