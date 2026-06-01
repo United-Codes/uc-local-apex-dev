@@ -5,6 +5,10 @@ description: Check if the database and ORDS can be upgraded successfully without
 
 When a new Oracle Database or ORDS version is released, it is crucial to ensure that the upgrade process does not lead to data loss or corruption. This skill covers the full upgrade workflow: testing the database upgrade, upgrading ORDS, and writing a migration guide for users.
 
+## Automated check (CI)
+
+The DB datafile-integrity part of this skill is also available as a manually-triggered GitHub Actions workflow: `.github/workflows/test-db-upgrade.yml`. Run it from the **Actions** tab (`workflow_dispatch`) with the new DB tag (e.g. `23.26.2.0`); it installs the currently-pinned version, seeds the shared fixtures below, upgrades in place on the same `oradata` volume, and asserts integrity. Use it as the fast pass/fail gate. The ORDS upgrade and migration-guide steps below remain manual.
+
 ## Start DB
 
 - Check docker is running: `docker ps`
@@ -14,20 +18,11 @@ When a new Oracle Database or ORDS version is released, it is crucial to ensure 
 
 - If it does not exist yet, create a new test user: `./local-26ai.sh create-user upgrade_test`
 - The command saves a named SQLcl connection automatically. Connect with: `sql -name local-26ai-upgrade_test`
-- If sample objects are not yet present, create them using a SQL script file and run it with `sql -name local-26ai-upgrade_test @path/to/script.sql`
-  - **Do not use heredocs (`<< 'EOF'`) with SQLcl** — they cause the shell to hang waiting for input. Always write SQL to a `.sql` file first, then pass it via `@`.
+- Seed the comprehensive shared fixture (the same one the CI workflow uses):
+  `sql -name local-26ai-upgrade_test @.github/fixtures/upgrade/seed.sql`
+  - **Do not use heredocs (`<< 'EOF'`) with SQLcl** — they cause the shell to hang waiting for input. Always run SQL from a `.sql` file via `@`.
   - `ROWS` is a reserved word in Oracle SQL — use `row_count` or another alias in `SELECT ... AS` clauses.
-- The test schema should be extensive and cover all major object types to simulate real-world usage:
-  - **Tables**: multiple related tables with primary keys, foreign keys, check constraints, identity columns, CLOB columns
-  - **Indexes**: single and composite, on various columns
-  - **Sequences**: standalone sequences
-  - **Data**: realistic INSERT statements across all tables, committed with `COMMIT`
-  - **Views**: regular views, including joins across multiple tables
-  - **Packages**: package spec + body with functions, procedures, pipelined functions, and record/table types
-  - **Triggers**: DML triggers (e.g. audit triggers that write to a log table)
-  - **Standalone functions**
-  - **Object types**: `CREATE OR REPLACE TYPE ... AS OBJECT` and nested table types
-  - **Materialized views**: `BUILD IMMEDIATE REFRESH ON DEMAND`
+- The fixture in [.github/fixtures/upgrade/seed.sql](../../../.github/fixtures/upgrade/seed.sql) deliberately covers all major object types (related tables with PK/FK/check/identity/CLOB and a nested-table column, single + composite indexes, a sequence, a joined view, a package with function/procedure/pipelined function/record+table types, a DML audit trigger, a standalone function, schema-level object + nested-table types, and a `BUILD IMMEDIATE REFRESH ON DEMAND` materialized view) with deterministic committed data. Extend it there (not in an ad-hoc script) so CI and manual runs stay in sync.
 - Verify all objects are created successfully by querying `user_objects` and checking row counts
 
 ## Pull new DB version
@@ -50,16 +45,19 @@ docker pull container-registry.oracle.com/database/free:23.26.1.0
 
 ## Verify data integrity post-upgrade
 
-Write a verification SQL script and run it with `sql -name local-26ai-upgrade_test @path/to/verify.sql`. The script should check:
+Run the shared verification script and confirm the output:
+`sql -name local-26ai-upgrade_test @.github/fixtures/upgrade/verify.sql`
 
-1. **DB version** — `SELECT version_full FROM v$instance`
-2. **Object validity** — query `user_objects` grouping by `object_type`, count total and `INVALID` objects; expect 0 invalids
-3. **Row counts** — `SELECT ... UNION ALL` across all tables to confirm data is intact
-4. **Views** — query each view and confirm expected rows are returned
-5. **Package functions** — call each function and confirm return values
-6. **Triggers** — fire a DML statement and verify the audit log table received the entry
-7. **Sequences** — `SELECT seq_name.NEXTVAL FROM dual`
-8. **Materialized views** — query the MV and confirm data
+[.github/fixtures/upgrade/verify.sql](../../../.github/fixtures/upgrade/verify.sql) is **read-only** (safe to run repeatedly) and emits `key=value` lines covering:
+
+1. **DB version** — `version_full` from `product_component_version` (accessible to any schema, unlike `v$instance`)
+2. **Object validity** — `INVALID` object count from `user_objects`; expect `invalid=0`
+3. **Row counts** — counts per table confirm data is intact
+4. **Views** — the joined view returns the expected rows
+5. **Package functions** — calls `total_salary` and the pipelined `emp_pipe`
+6. **Materialized views** — the MV still holds its rows
+
+Triggers and sequences are write operations, so the CI workflow checks them in a separate post-upgrade step (fire one `INSERT`, confirm the audit log grows by 1, then `seq_ticket.NEXTVAL`). Do the same manually if running by hand.
 
 ## Upgrade ORDS
 
