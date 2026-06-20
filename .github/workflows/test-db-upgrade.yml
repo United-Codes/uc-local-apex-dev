@@ -91,6 +91,18 @@ jobs:
           grep -qx 'eng_pipe=2'     baseline.out
           grep -qx 'mv_rows=2'      baseline.out
 
+          # Snapshot the live APEX schema (run as SYS -- needs dba_* visibility).
+          # Assert the hard invariants now, so a pre-existing APEX problem fails
+          # here rather than being mistaken for upgrade damage later.
+          sql -S -name "${DB_CONN_NAME}" \
+            @"$PWD/.github/fixtures/upgrade/verify-apex.sql" \
+            | sed 's/[[:space:]]*$//' | tee apex-baseline.out
+
+          grep -qx 'apex_registry_status=VALID'   apex-baseline.out
+          grep -qx 'apex_invalid=0'               apex-baseline.out
+          grep -qx 'apex_apps_view_ok=yes'        apex-baseline.out
+          grep -qx 'apex_workspaces_view_ok=yes'  apex-baseline.out
+
       - name: Stop database (graceful shutdown)
         run: ./local-26ai.sh stop
 
@@ -163,6 +175,24 @@ jobs:
           test -n "$new_ver"            # version must be detectable post-upgrade
           test "$old_ver" != "$new_ver" # and must differ from the baseline
 
+          # Re-snapshot the live APEX schema and assert the same hard invariants.
+          sql -S -name "${DB_CONN_NAME}" \
+            @"$PWD/.github/fixtures/upgrade/verify-apex.sql" \
+            | sed 's/[[:space:]]*$//' | tee apex-post.out
+
+          grep -qx 'apex_registry_status=VALID'   apex-post.out
+          grep -qx 'apex_invalid=0'               apex-post.out
+          grep -qx 'apex_apps_view_ok=yes'        apex-post.out
+          grep -qx 'apex_workspaces_view_ok=yes'  apex-post.out
+
+          # The APEX version is unchanged by a DB-image upgrade, so the whole
+          # snapshot -- every per-type object count plus the version line -- must
+          # match the baseline exactly. This is the core "APEX has a variety of
+          # objects, none lost or invalidated" check, and needs no hardcoded
+          # counts. (If a future DB upgrade legitimately changes an APEX count,
+          # relax this to the grep invariants + an apex_objects equality check.)
+          diff apex-baseline.out apex-post.out
+
       # DML must still flow: the audit trigger fires and sequences advance.
       - name: Verify writes still work (post-upgrade)
         run: |
@@ -191,6 +221,7 @@ jobs:
           docker compose logs --no-color ords-26ai > artifacts/ords.log 2>&1 || true
           docker compose ps > artifacts/ps.txt 2>&1 || true
           docker compose config > artifacts/compose-resolved.yml 2>&1 || true
+          cp -f apex-baseline.out apex-post.out artifacts/ 2>/dev/null || true
 
       - name: Upload failure artifacts
         if: failure()
