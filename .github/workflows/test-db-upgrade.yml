@@ -154,11 +154,14 @@ jobs:
           # An upgrade actually happened: version_full changed from the baseline.
           # (Compared rather than matched to the tag, since version_full carries
           # extra components beyond the image tag.)
-          old_ver=$(grep '^version_full=' baseline.out)
-          new_ver=$(grep '^version_full=' post.out)
+          # `|| true` so a missing line gives a clear assertion failure below
+          # rather than silently aborting the step via `set -e`.
+          old_ver=$(grep '^version_full=' baseline.out || true)
+          new_ver=$(grep '^version_full=' post.out   || true)
           echo "before: $old_ver"
           echo "after:  $new_ver"
-          test "$old_ver" != "$new_ver"
+          test -n "$new_ver"            # version must be detectable post-upgrade
+          test "$old_ver" != "$new_ver" # and must differ from the baseline
 
       # DML must still flow: the audit trigger fires and sequences advance.
       - name: Verify writes still work (post-upgrade)

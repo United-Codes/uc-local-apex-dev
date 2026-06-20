@@ -13,10 +13,16 @@ set define off
 set heading off feedback off pagesize 0 verify off trimspool on
 whenever sqlerror exit failure
 
--- DB version (informational; the workflow asserts the expected tag post-upgrade)
-select 'version_full=' || version_full
-  from product_component_version
- where product like 'Oracle Database%';
+-- DB version (informational; the workflow asserts the expected tag post-upgrade).
+-- Wrapped in a dual select so exactly one `version_full=` line is always emitted,
+-- even if the scalar subquery matches no row -- otherwise the workflow's
+-- `grep '^version_full='` finds nothing and aborts under `set -e`.
+select 'version_full=' ||
+       (select version_full
+          from product_component_version
+         where product like 'Oracle Database%'
+           and rownum = 1)
+  from dual;
 
 -- No object may be left INVALID by the upgrade
 select 'invalid=' || count(*)
