@@ -40,6 +40,31 @@ services:
     image: container-registry.oracle.com/database/ords:26.1.2
     container_name: local-26ai-ords
 
+  # Optional dev-only SSO proxy. Sits in front of ORDS and always injects the
+  # X-APEX-REMOTE-USER=ADMIN header so an APEX "HTTP Header Variable" auth scheme
+  # logs in instantly without a real IdP. OFF by default: only starts when the
+  # "sso" profile is active (set COMPOSE_PROFILES=sso in .env). Reachable at
+  # https://localhost:8444/ords/ ; ORDS's own 8181/8443 ports stay available for
+  # normal (non-SSO) access. HTTPS only — ORDS force-redirects plain HTTP.
+  nginx-sso:
+    profiles: ["sso"]
+    image: nginx:1.27-alpine
+    container_name: local-26ai-nginx-sso
+    ports:
+      - 8444:443
+    volumes:
+      - type: bind
+        source: nginx-sso/nginx.conf
+        target: /etc/nginx/nginx.conf
+        read_only: true
+      - type: bind
+        source: ords-config/ssl
+        target: /etc/nginx/certs
+        read_only: true
+    depends_on:
+      - ords-26ai
+    restart: no
+
 networks:
   default:
     driver: bridge

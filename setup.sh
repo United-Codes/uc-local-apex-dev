@@ -24,6 +24,11 @@ echo "DBSERVICENAME=\"FREEPDB1\"" >>.env
 echo "DBHOST=\"26ai\"" >>.env
 echo "DBPORT=\"1521\"" >>.env
 echo "FORCE_SECURE=\"false\"" >>.env
+echo "" >>.env
+echo "# Optional dev-only SSO proxy: NGINX in front of ORDS that always injects" >>.env
+echo "# X-APEX-REMOTE-USER=ADMIN. Uncomment to enable, then reach APEX through" >>.env
+echo "# https://localhost:8444/ords/ . See nginx-sso/nginx.conf." >>.env
+echo "# COMPOSE_PROFILES=sso" >>.env
 
 echo "Created .env file"
 
