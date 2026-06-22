@@ -17,10 +17,13 @@ whenever sqlerror exit failure
 -- Wrapped in a dual select so exactly one `version_full=` line is always emitted,
 -- even if the scalar subquery matches no row -- otherwise the workflow's
 -- `grep '^version_full='` finds nothing and aborts under `set -e`.
+-- `Oracle%Database%` matches both the old "Oracle Database ..." product name
+-- and the newer "Oracle AI Database ..." name (renamed in 26ai), which the
+-- narrower `Oracle Database%` missed -- leaving version_full empty.
 select 'version_full=' ||
        (select version_full
           from product_component_version
-         where product like 'Oracle Database%'
+         where product like 'Oracle%Database%'
            and rownum = 1)
   from dual;
 
