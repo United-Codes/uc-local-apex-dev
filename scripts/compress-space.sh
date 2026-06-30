@@ -92,20 +92,16 @@ select round((select sum(bytes) from dba_segments   where tablespace_name = '$TB
 prompt Setting tablespace compression defaults:
 
 begin
-  execute immediate 'ALTER TABLESPACE $TBS DEFAULT TABLE COMPRESS FOR OLTP';
-  dbms_output.put_line('default table compression: COMPRESS FOR OLTP');
+  -- Set the TABLE and INDEX defaults in a SINGLE statement: each
+  -- ALTER TABLESPACE ... DEFAULT replaces the whole default spec, so splitting
+  -- this into two ALTERs would have the index clause silently reset the table
+  -- default back to NOCOMPRESS. The DEFAULT keyword is also required before the
+  -- INDEX clause (ALTER TABLESPACE ... INDEX COMPRESS ... alone raises ORA-02142).
+  execute immediate 'ALTER TABLESPACE $TBS '||
+    'DEFAULT TABLE COMPRESS FOR OLTP INDEX COMPRESS ADVANCED LOW';
+  dbms_output.put_line('defaults set: TABLE COMPRESS FOR OLTP, INDEX COMPRESS ADVANCED LOW');
 exception when others then
-  dbms_output.put_line('skip table default: '||sqlerrm);
-end;
-/
-
-begin
-  -- The DEFAULT keyword is required to introduce the index-compression clause;
-  -- ALTER TABLESPACE ... INDEX COMPRESS ... alone raises ORA-02142.
-  execute immediate 'ALTER TABLESPACE $TBS DEFAULT INDEX COMPRESS ADVANCED LOW';
-  dbms_output.put_line('default index compression: COMPRESS ADVANCED LOW');
-exception when others then
-  dbms_output.put_line('skip index default: '||sqlerrm);
+  dbms_output.put_line('skip tablespace defaults: '||sqlerrm);
 end;
 /
 
