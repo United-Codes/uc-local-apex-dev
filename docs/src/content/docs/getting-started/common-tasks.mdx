@@ -76,11 +76,22 @@ local-26ai.sh used-space
 
 ### Shrink Database Files
 
-If your tablespaces have grown larger than the space they actually use, you can shrink them to reclaim space. This can take a while.
+If your tablespaces have grown larger than the space they actually use, you can reclaim that space with:
 
 ```bash
 local-26ai.sh shrink-space
 ```
+
+This can take a while. The script works through several steps, each safe to run repeatedly:
+
+1. **Purge audit records** – the `AUDIT_TRAIL` tablespace can balloon to several GB and never shrink back on its own. You are prompted before any audit history is deleted (defaults to yes; non-interactive runs purge automatically).
+2. **Drop a leftover old APEX engine** – after an [APEX upgrade](/products/uc-local-apex-dev/docs/migrations/upgrade-apex/) the previous version's schema (e.g. `APEX_240200`) is left behind and wastes ~hundreds of MB. If one is found you are asked to confirm before it is dropped. This is **irreversible**, so it is skipped when the script runs non-interactively.
+3. **Shrink the APEX file repository** – uploaded/imported files in `FLOWS_FILES` leave dead space inside the storage that a normal tablespace shrink can't reclaim. This is compacted without touching your files.
+4. **Shrink the tablespaces and resize the datafiles** – returns the freed space to your disk.
+
+:::caution
+All steps are designed to be non-destructive to your apps and data, but the audit purge deletes audit history and the old-APEX drop removes the prior engine schema. These run only after you confirm them. Make a [backup](/products/uc-local-apex-dev/docs/getting-started/backups/) first if in doubt.
+:::
 
 ### Disable Archive Logs
 
