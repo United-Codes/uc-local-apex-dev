@@ -90,6 +90,9 @@ jobs:
           grep -qx 'eng_total=16000' baseline.out
           grep -qx 'eng_pipe=2'     baseline.out
           grep -qx 'mv_rows=2'      baseline.out
+          grep -qx 'compressed_rows=500'       baseline.out
+          grep -qx 'compressed_tab=ADVANCED'   baseline.out
+          grep -qx 'compressed_idx=ADVANCED LOW' baseline.out
 
           # Snapshot the live APEX schema (run as SYS -- needs dba_* visibility).
           # Assert the hard invariants now, so a pre-existing APEX problem fails
@@ -162,6 +165,9 @@ jobs:
           grep -qx 'eng_total=16000' post.out
           grep -qx 'eng_pipe=2'     post.out
           grep -qx 'mv_rows=2'      post.out
+          grep -qx 'compressed_rows=500'       post.out
+          grep -qx 'compressed_tab=ADVANCED'   post.out
+          grep -qx 'compressed_idx=ADVANCED LOW' post.out
 
           # An upgrade actually happened: version_full changed from the baseline.
           # (Compared rather than matched to the tag, since version_full carries

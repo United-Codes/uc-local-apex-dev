@@ -221,16 +221,19 @@ jobs:
           # shellcheck disable=SC1091
           source ./scripts/util/load_env.sh
 
-          # drop-user.sh has an unguarded `read` — feed it a 'y'.
-          printf 'y\n' | ./scripts/drop-user.sh CITEST1
+          ./scripts/drop-user.sh CITEST1 -y
 
           sql -S -name "$DB_CONN_NAME" <<'SQL' | sed 's/[[:space:]]*$//' | tee drop.out
           whenever sqlerror exit failure
           set heading off feedback off pagesize 0
           select 'users=' || count(*) from dba_users where username = 'CITEST1';
+          -- drop-user also drops the per-user tablespace + datafile, so the
+          -- space is reclaimed instead of leaking as an orphan.
+          select 'tbs=' || count(*) from dba_tablespaces where tablespace_name = 'TBS_CITEST1';
           exit
           SQL
           grep -qx 'users=0' drop.out
+          grep -qx 'tbs=0'   drop.out
 
           # drop-user.sh comments out the password line in .env
           grep -q '^# *CITEST1_USER_PASSWORD=' .env
@@ -275,6 +278,69 @@ jobs:
           exit
           SQL
           grep -qx 'ws=1' restore_ws.out
+
+      - name: Test create-user.sh --compress
+        run: |
+          set -euo pipefail
+          # shellcheck disable=SC1091
+          source ./scripts/util/load_env.sh
+
+          # --compress sets Advanced Compression defaults on the new schema's
+          # tablespace so future segments are born compressed. Assert BOTH the
+          # table and index defaults are set: they must be applied in a single
+          # ALTER TABLESPACE (a separate index ALTER silently resets the table
+          # default back to NOCOMPRESS).
+          ./scripts/create-user.sh CMPDEF --skip-workspace --compress
+
+          sql -S -name "$DB_CONN_NAME" <<'SQL' | sed 's/[[:space:]]*$//' | tee compress_defaults.out
+          whenever sqlerror exit failure
+          set heading off feedback off pagesize 0
+          select 'def_tab=' || def_tab_compression  from dba_tablespaces where tablespace_name = 'TBS_CMPDEF';
+          select 'def_idx=' || def_index_compression from dba_tablespaces where tablespace_name = 'TBS_CMPDEF';
+          exit
+          SQL
+          grep -qx 'def_tab=ENABLED' compress_defaults.out
+          grep -qx 'def_idx=ENABLED' compress_defaults.out
+
+      - name: Test compress-space.sh
+        run: |
+          set -euo pipefail
+          # shellcheck disable=SC1091
+          source ./scripts/util/load_env.sh
+
+          # Create an uncompressed schema with data, then compress it in place. A
+          # multi-column index is used on purpose: advanced index compression
+          # skips single-column unique keys (nothing to dedup).
+          ./scripts/create-user.sh CMPOLD --skip-workspace
+
+          sql -S -name "${DB_CONN_BASE}-cmpold" <<'SQL'
+          whenever sqlerror exit failure
+          create table t_comp (id number, grp varchar2(20), txt varchar2(200));
+          create index t_comp_ix on t_comp (grp, id);
+          insert into t_comp
+            select level, 'g' || mod(level, 5), rpad('x', 200, 'x')
+              from dual connect by level <= 5000;
+          commit;
+          exit
+          SQL
+
+          ./scripts/compress-space.sh CMPOLD -y
+
+          sql -S -name "$DB_CONN_NAME" <<'SQL' | sed 's/[[:space:]]*$//' | tee compress_space.out
+          whenever sqlerror exit failure
+          set heading off feedback off pagesize 0
+          -- existing table + multi-column index were rebuilt compressed
+          select 'tab=' || compress_for from dba_tables  where owner = 'CMPOLD' and table_name = 'T_COMP';
+          select 'idx=' || compression  from dba_indexes where owner = 'CMPOLD' and index_name = 'T_COMP_IX';
+          -- and the tablespace defaults were set for future segments
+          select 'def_tab=' || def_tab_compression  from dba_tablespaces where tablespace_name = 'TBS_CMPOLD';
+          select 'def_idx=' || def_index_compression from dba_tablespaces where tablespace_name = 'TBS_CMPOLD';
+          exit
+          SQL
+          grep -qx 'tab=ADVANCED'     compress_space.out
+          grep -qx 'idx=ADVANCED LOW' compress_space.out
+          grep -qx 'def_tab=ENABLED'  compress_space.out
+          grep -qx 'def_idx=ENABLED'  compress_space.out
 
       - name: Collect logs on failure
         if: failure()

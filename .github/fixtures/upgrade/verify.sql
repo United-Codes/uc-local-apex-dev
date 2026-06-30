@@ -55,4 +55,11 @@ select 'eng_pipe=' || count(*)
 -- Materialized view retains its rows
 select 'mv_rows=' || count(*) from mv_dept_salary;
 
+-- Advanced compression survives the upgrade: row count + storage attributes.
+-- compress_for/compression read identically before and after, so the workflow
+-- asserts the same values pre- and post-upgrade.
+select 'compressed_rows=' || count(*) from compressed_events;
+select 'compressed_tab=' || compress_for from user_tables  where table_name = 'COMPRESSED_EVENTS';
+select 'compressed_idx=' || compression  from user_indexes where index_name = 'IDX_COMP_EVENTS';
+
 exit
