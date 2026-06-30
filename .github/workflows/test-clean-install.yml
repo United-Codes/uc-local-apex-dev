@@ -36,6 +36,37 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Rootless podman defaults to the userspace fuse-overlayfs graph driver,
+      # which makes Oracle's write-heavy first boot ~2x slower than docker
+      # (~28 min vs ~15 min for the same image) and pushed the DB past the
+      # readiness timeout. Modern runner kernels support rootless *native*
+      # kernel overlay, which is far faster; select it by clearing the fuse
+      # mount_program. Written before any podman command so it applies to a
+      # still-empty storage graph. If the kernel can't do rootless native
+      # overlay, `podman info` fails -- wipe the (empty) graph + our config and
+      # fall back to the default driver so the leg still runs, just slower.
+      - name: Use native overlay storage for rootless podman
+        if: matrix.engine == 'podman'
+        run: |
+          set -euo pipefail
+          conf="$HOME/.config/containers/storage.conf"
+          mkdir -p "$(dirname "$conf")"
+          cat > "$conf" <<'CONF'
+          [storage]
+          driver = "overlay"
+
+          [storage.options.overlay]
+          mount_program = ""
+          CONF
+          if podman info > /tmp/podman-info.txt 2>&1; then
+            echo "podman storage initialized with native overlay"
+          else
+            echo "native overlay unsupported; falling back to default storage"
+            rm -f "$conf"
+            rm -rf "$HOME/.local/share/containers/storage"
+          fi
+          grep -iE 'graphDriverName|mount_program|graphRoot' /tmp/podman-info.txt || true
+
       # podman is preinstalled on ubuntu-latest, but `podman compose` delegates
       # to an external provider (the docker compose v2 plugin already on the
       # runner). That provider talks to podman's Docker-compatible API socket as
