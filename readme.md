@@ -40,6 +40,7 @@ I am especially thankful for improvements to the bash scripts.
 ## Special thanks
 
 - The [contributors](https://github.com/United-Codes/uc-local-apex-dev/graphs/contributors) for their help
+- Connor McDonald for his blog post on [space efficiently using the Free Edition](https://connor-mcdonald.com/2023/12/18/the-ultimate-database-free-edition/)
 - Tim Hall for the [drop_all.sql](https://oracle-base.com/dba/script?category=miscellaneous&file=drop_all.sql) script
 - Philipp Salvisberg for [helping me to figure out how to use the debugger](https://gist.github.com/PhilippSalvisberg/2f2853bc7a95fa86d9de9c0deab10602)
 - Scott Spendolini for his blog post on [how to add self-signed certificates to ORDS](https://spendolini.blog/adding-ssl-to-your-ords-container)
