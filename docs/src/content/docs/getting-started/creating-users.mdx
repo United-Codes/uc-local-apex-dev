@@ -75,11 +75,22 @@ local-26ai.sh clear-schema movies -y
 
 ### Drop a Schema
 
-Completely remove a schema and all its objects:
+Completely remove a schema and all its objects. This also drops the schema's dedicated tablespace and its datafile, so the disk space is reclaimed instead of being left behind as an orphan:
 
 ```bash
 local-26ai.sh drop-user movies
+# Asks for confirmation before proceeding
 ```
+
+To skip the confirmation prompt (useful for automation), use the `-y` flag:
+
+```bash
+local-26ai.sh drop-user movies -y
+```
+
+<Aside type="caution" title="Data Loss Warning">
+  This permanently removes the schema, all its objects, and its datafile. Make sure you have backups of anything you need.
+</Aside>
 
 ## Database Access
 
