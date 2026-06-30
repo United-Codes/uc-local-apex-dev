@@ -140,30 +140,31 @@ $DOCKER_COMPOSE up -d
 # ---------------------------------------------------------------------------
 # 5. Wait for the database to be ready
 # ---------------------------------------------------------------------------
-# Rootless podman boots the DB noticeably slower than docker -- first-boot has
-# been observed at ~28 min under podman vs ~15 min under docker for the same
-# image -- so give podman a wider ceiling. docker keeps the tighter 25 min so a
-# real docker-side regression still fails fast instead of hiding for 40 minutes.
-if [ "$CONTAINER_CLI" = "podman" ]; then
-  db_wait_secs=2400 # 40 minutes
-else
-  db_wait_secs=1500 # 25 minutes
-fi
-banner "Wait for database to be ready (up to $((db_wait_secs / 60)) minutes)"
-deadline=$((SECONDS + db_wait_secs))
+banner "Wait for database to be ready (up to 25 minutes)"
+deadline=$((SECONDS + 1500))
 db_ready=false
 while (( SECONDS < deadline )); do
-  if $DOCKER_COMPOSE logs 26ai 2>&1 | grep -q "DATABASE IS READY TO USE!"; then
+  # Capture the logs first, then match against the variable -- do NOT pipe
+  # straight into `grep -q`. Under `set -o pipefail`, grep closes the pipe on
+  # its first match (SIGPIPE to the writer) and `podman compose logs` can also
+  # exit non-zero on its own, either of which makes the *pipeline* non-zero even
+  # when the banner matched -- so the `if` never fired and the podman leg looped
+  # until timeout despite the DB being ready. docker's compose logs exits clean,
+  # which is why only podman hung. The capture + case match avoids the pipe.
+  db_log=$($DOCKER_COMPOSE logs 26ai 2>&1 || true)
+  case "$db_log" in
+  *"DATABASE IS READY TO USE!"*)
     echo "Database is ready."
     db_ready=true
     break
-  fi
+    ;;
+  esac
   sleep 10
 done
 
 if [ "$db_ready" != true ]; then
-  echo "ERROR: database did not become ready within $((db_wait_secs / 60)) minutes" >&2
-  $DOCKER_COMPOSE logs 26ai | tail -100 >&2 || true
+  echo "ERROR: database did not become ready within 25 minutes" >&2
+  printf '%s\n' "$db_log" | tail -100 >&2 || true
   exit 1
 fi
 
@@ -221,12 +222,17 @@ $DOCKER_COMPOSE restart ords-26ai
 # Wait for ORDS to come back so callers (and CI) can immediately use it.
 deadline=$((SECONDS + 180))
 while (( SECONDS < deadline )); do
-  if $CONTAINER_CLI exec local-26ai-ords bash -c \
-       "curl -fsS -o /dev/null -w '%{http_code}' http://localhost:8080/ords/" \
-       2>/dev/null | grep -qE '^(200|30[0-9])$'; then
+  # Capture then match (no pipe into grep) for the same pipefail reason as the
+  # DB wait above: a non-zero curl/exec while ORDS is still restarting must not
+  # be masked into a false positive, nor a SIGPIPE into a false negative.
+  http=$($CONTAINER_CLI exec local-26ai-ords bash -c \
+    "curl -fsS -o /dev/null -w '%{http_code}' http://localhost:8080/ords/" 2>/dev/null || true)
+  case "$http" in
+  200 | 30[0-9])
     echo "ORDS is back."
     break
-  fi
+    ;;
+  esac
   sleep 5
 done
 
