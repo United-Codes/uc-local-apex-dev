@@ -34,4 +34,5 @@ FROM dba_data_files
  order by totalspace desc;
 SQL
 
-echo "Run the shrink-space script to reduce space usage"
+echo "Run the shrink-space script to reclaim unused space across all tablespaces."
+echo "To also make a single schema's data smaller, run: compress-space <schema>"
