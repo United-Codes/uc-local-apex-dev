@@ -140,8 +140,17 @@ $DOCKER_COMPOSE up -d
 # ---------------------------------------------------------------------------
 # 5. Wait for the database to be ready
 # ---------------------------------------------------------------------------
-banner "Wait for database to be ready (up to 25 minutes)"
-deadline=$((SECONDS + 1500))
+# Rootless podman boots the DB noticeably slower than docker -- first-boot has
+# been observed at ~28 min under podman vs ~15 min under docker for the same
+# image -- so give podman a wider ceiling. docker keeps the tighter 25 min so a
+# real docker-side regression still fails fast instead of hiding for 40 minutes.
+if [ "$CONTAINER_CLI" = "podman" ]; then
+  db_wait_secs=2400 # 40 minutes
+else
+  db_wait_secs=1500 # 25 minutes
+fi
+banner "Wait for database to be ready (up to $((db_wait_secs / 60)) minutes)"
+deadline=$((SECONDS + db_wait_secs))
 db_ready=false
 while (( SECONDS < deadline )); do
   if $DOCKER_COMPOSE logs 26ai 2>&1 | grep -q "DATABASE IS READY TO USE!"; then
@@ -153,7 +162,7 @@ while (( SECONDS < deadline )); do
 done
 
 if [ "$db_ready" != true ]; then
-  echo "ERROR: database did not become ready within 25 minutes" >&2
+  echo "ERROR: database did not become ready within $((db_wait_secs / 60)) minutes" >&2
   $DOCKER_COMPOSE logs 26ai | tail -100 >&2 || true
   exit 1
 fi
