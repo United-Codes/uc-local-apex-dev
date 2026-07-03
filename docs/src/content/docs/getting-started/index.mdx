@@ -13,42 +13,10 @@ Get your Oracle 26ai database with APEX and ORDS running locally in just a few m
 
 Before you begin, make sure you have the following installed:
 
-### Required Software
-
 - **Docker or Podman** — both are natively supported. The scripts auto-detect which engine is installed (preferring `docker` if both are present).
 - **Compose** — either `docker compose` (v2 plugin, or the legacy `docker-compose` v1) or the native `podman compose` subcommand.
 - **SQLcl** with "sql" command in PATH
 - **Bash-compatible shell**
-
-<Aside type="tip" title="Forcing the container engine">
-If you have both Docker and Podman installed and want to force one, set `CONTAINER_CLI` before running any script:
-
-```bash
-CONTAINER_CLI=podman ./install.sh
-```
-
-</Aside>
-
-<Aside type="note" title="Podman compose provider">
-  On Podman we use the native `podman compose` subcommand (which delegates to a
-  compose provider), not the standalone `podman-compose` — the latter doesn't
-  support everything in this project's `docker-compose.yml`.
-
-  The provider talks to Podman's API socket. If `podman compose` fails with
-  _"Cannot connect to the Docker daemon at unix:///run/user/.../podman/podman.sock"_,
-  enable the rootless socket:
-
-  ```bash
-  systemctl --user enable --now podman.socket
-  ```
-
-  On a **headless server you use over SSH**, also enable lingering so the
-  socket survives after you log out:
-
-  ```bash
-  loginctl enable-linger "$USER"
-  ```
-</Aside>
 
 <Aside type="caution" title="Resource Requirements">
 Make sure your virtual machine has enough resources allocated. **The default Podman VM will cause issues with Oracle**.
@@ -98,7 +66,10 @@ chmod +x ./install.sh ./local-26ai.sh ./setup.sh ./scripts/*.sh
 ./install.sh
 ```
 
-`install.sh` is a one-shot installer that does the full bootstrap end-to-end:
+The installer does the full bootstrap end-to-end: it generates an `.env` file with a random SYS password, pulls the images, starts the containers, waits for the database, installs APEX with dev-friendly defaults, and configures ORDS. The whole flow takes roughly 15–20 minutes on a typical machine, mostly waiting on the Oracle DB to come up. When it finishes you'll see a `=== Done ===` banner with the next steps.
+
+<details>
+<summary>What install.sh does in detail</summary>
 
 1. Checks that a container engine (`docker` or `podman`) with a compose command, `sql` (SQLcl), `unzip` and `curl`/`wget` are on your `PATH`.
 2. Runs `./setup.sh` to generate `.env` with a random Oracle SYS password (skipped if `.env` already exists and contains all required keys).
@@ -109,11 +80,41 @@ chmod +x ./install.sh ./local-26ai.sh ./setup.sh ./scripts/*.sh
 7. Runs `./scripts/after-first-db-start.sh` non-interactively — installs APEX, applies dev-friendly defaults (disables archive logs, relaxes APEX password rules), and sets the APEX `INTERNAL`/`ADMIN` password to the same `ORACLE_PASSWORD` value from `.env`.
 8. Restarts the ORDS container so it picks up the new APEX module + config change, and waits for it to come back.
 
-The whole flow takes roughly 15–20 minutes on a typical machine, mostly waiting on the Oracle DB to come up. When it finishes you'll see a `=== Done ===` banner with the next steps.
+</details>
+
+<Aside type="tip" title="Forcing the container engine">
+If you have both Docker and Podman installed and want to force one, set `CONTAINER_CLI` before running any script:
+
+```bash
+CONTAINER_CLI=podman ./install.sh
+```
+
+</Aside>
+
+<Aside type="note" title="Podman compose provider">
+  On Podman we use the native `podman compose` subcommand (which delegates to a
+  compose provider), not the standalone `podman-compose` — the latter doesn't
+  support everything in this project's `docker-compose.yml`.
+
+  The provider talks to Podman's API socket. If `podman compose` fails with
+  _"Cannot connect to the Docker daemon at unix:///run/user/.../podman/podman.sock"_,
+  enable the rootless socket:
+
+  ```bash
+  systemctl --user enable --now podman.socket
+  ```
+
+  On a **headless server you use over SSH**, also enable lingering so the
+  socket survives after you log out:
+
+  ```bash
+  loginctl enable-linger "$USER"
+  ```
+</Aside>
 
 ### 4. Log into APEX
 
-Visit http://localhost:8181/ords/apex to log in. `install.sh` already set `ords --config /etc/ords/config config --db-pool default set plsql.gateway.mode proxied` and restarted ORDS so APEX is ready.
+Visit http://localhost:8181/ords/apex and log in to the `INTERNAL` workspace with user `ADMIN` and the `ORACLE_PASSWORD` value from the generated `.env` file.
 
 If you get an "Account Is Locked" message:
 
@@ -150,16 +151,12 @@ local-26ai.sh backup-all
 local-26ai.sh stop
 ```
 
-<Aside type="tip" title="Script Help">
-  Run `local-26ai.sh --help` to see all available commands and options.
-</Aside>
-
 ## Next Steps
 
 Now that your environment is running:
 
-1. **Create your first workspace**: `local-26ai.sh create-user myproject`
-2. **Explore the available scripts**: `local-26ai.sh --help`
+1. **Create your first workspace**: `local-26ai.sh create-user myproject` — see [Creating Users](/products/uc-local-apex-dev/docs/getting-started/creating-users/)
+2. **See everything this project can do**: check the [Command Reference](/products/uc-local-apex-dev/docs/reference/commands/) or run `local-26ai.sh --help`
 3. **Start developing your APEX applications**
 
 ## Access Your Environment
@@ -168,9 +165,11 @@ Once setup is complete, you can access:
 
 - **APEX**: http://localhost:8181/ords/apex
 - **ORDS Landing**: http://localhost:8181/ords/\_/landing
-- **Database**: ai:1521 (Service: FREEPDB1)
+- **Database**: localhost:1521 (Service: FREEPDB1)
 
 ### Default APEX Credentials
 
 - **INTERNAL workspace**: `ADMIN` / value of `ORACLE_PASSWORD` in `.env`
-- **Your own workspaces**: schema/workspace name from `./scripts/create-user.sh <NAME>` / matching `<NAME>_USER_PASSWORD` in `.env`
+- **Your own workspaces** (created with `create-user`): `ADMIN` or the schema name / `Welcome_1`
+
+The database schema password is different from the APEX login: it's the generated `<NAME>_USER_PASSWORD` value in `.env`.

@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# desc: Compress an existing schema's tablespace and give freed space back to the OS
 
 set -e
 

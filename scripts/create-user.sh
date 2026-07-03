@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# desc: Create a DB schema + APEX workspace with dev grants (--skip-workspace, --compress)
 
 set -e
 

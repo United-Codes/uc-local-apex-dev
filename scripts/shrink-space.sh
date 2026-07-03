@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# desc: Shrink tablespaces and datafiles to reclaim unused space
 
 set -e
 

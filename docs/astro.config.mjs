@@ -55,7 +55,21 @@ export default defineConfig({
 				},
 				{
 					label: "Getting Started",
-					items: [{ autogenerate: { directory: "getting-started" } }],
+					items: ["getting-started", "other/podman-on-mac"],
+				},
+				{
+					label: "Guides",
+					items: [
+						"getting-started/creating-users",
+						"getting-started/backups",
+						"getting-started/plsql-debugging",
+						"getting-started/install-apps-scripts",
+						"getting-started/common-tasks",
+					],
+				},
+				{
+					label: "Reference",
+					items: ["reference/commands"],
 				},
 				{
 					label: "Migrations",
@@ -63,7 +77,7 @@ export default defineConfig({
 				},
 				{
 					label: "Other",
-					items: [{ autogenerate: { directory: "other" } }],
+					items: ["other/faq"],
 				},
 			],
 			customCss: ["./src/styles/uc.css"],

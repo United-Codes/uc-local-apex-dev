@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# desc: Gracefully shut down the database, then stop the containers
 
 set -e
 

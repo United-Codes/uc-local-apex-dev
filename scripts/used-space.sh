@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# desc: Show database space usage vs the 12GB Free-edition limit
 
 set -e
 

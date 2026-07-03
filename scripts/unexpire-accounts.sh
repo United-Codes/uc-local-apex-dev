@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# desc: Unlock and unexpire APEX/ORDS accounts (fixes "Account Is Locked")
 
 set -e
 

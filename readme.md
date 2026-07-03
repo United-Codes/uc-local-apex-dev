@@ -6,13 +6,16 @@ A containerized development environment (works with Docker, Podman, or any conta
 
 ## Features
 
-- ✅ One-command operations: create users, backups, clear schemas, test installs
-- ✅ Create APEX workspaces and database schemas with optimal development grants
+Everything is a single command via the `local-26ai.sh` wrapper — run `local-26ai.sh --help` or see the [Command Reference](https://www.united-codes.com/products/uc-local-apex-dev/docs/reference/commands/) for the full list.
+
+- ✅ [One-command operations](https://www.united-codes.com/products/uc-local-apex-dev/docs/reference/commands/): create users, backups, clear schemas, test installs
+- ✅ [Create APEX workspaces and database schemas](https://www.united-codes.com/products/uc-local-apex-dev/docs/getting-started/creating-users/) with optimal development grants
 - ✅ All users automatically registered in SQLcl and VS Code for instant access
-- ✅ Built-in Oracle DataPump backup and restore
-- ✅ ORDS with SSL support for production-like local development
-- ✅ Test APEX application installs repeatedly in isolated test schemas
-- ✅ Full PL/SQL debugging support with VS Code SQL Developer
+- ✅ [Built-in Oracle DataPump backup and restore](https://www.united-codes.com/products/uc-local-apex-dev/docs/getting-started/backups/)
+- ✅ [ORDS with SSL support](https://www.united-codes.com/products/uc-local-apex-dev/docs/getting-started/common-tasks/#ssl-configuration) for production-like local development
+- ✅ [Test APEX application installs](https://www.united-codes.com/products/uc-local-apex-dev/docs/getting-started/install-apps-scripts/) repeatedly in isolated test schemas
+- ✅ [Full PL/SQL debugging support](https://www.united-codes.com/products/uc-local-apex-dev/docs/getting-started/plsql-debugging/) with VS Code SQL Developer
+- ✅ Disk-space tooling for the 12GB Free edition: usage report, shrink, and Advanced Compression
 
 **⚠️ This is not for production use!** Intentionally unsecure and optimized for ease of development. Passwords stored in plain text, security features relaxed. For local development only.
 

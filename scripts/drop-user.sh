@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# desc: Drop a schema including its tablespace and datafile (-y skips confirmation)
 
 set -e
 

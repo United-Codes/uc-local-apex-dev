@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# desc: Import a DataPump dump for a schema (-rs remaps to a different schema name)
 
 set -e
 

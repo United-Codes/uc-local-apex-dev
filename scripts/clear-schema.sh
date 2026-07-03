@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# desc: Drop all objects in a schema, keeping the schema itself (-y skips confirmation)
 
 set -e
 
