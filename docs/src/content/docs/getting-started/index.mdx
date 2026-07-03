@@ -75,10 +75,12 @@ The installer does the full bootstrap end-to-end: it generates an `.env` file wi
 2. Runs `./setup.sh` to generate `.env` with a random Oracle SYS password (skipped if `.env` already exists and contains all required keys).
 3. Pulls the DB + ORDS container images.
 4. Starts the stack with `<engine> compose up -d`.
-5. Waits for the database to be ready (up to 25 min) and for ORDS to finish its first-boot install (up to 15 min).
-6. Sets the ORDS PL/SQL gateway mode to `proxied` (the recommended setting for APEX).
-7. Runs `./scripts/after-first-db-start.sh` non-interactively — installs APEX, applies dev-friendly defaults (disables archive logs, relaxes APEX password rules), and sets the APEX `INTERNAL`/`ADMIN` password to the same `ORACLE_PASSWORD` value from `.env`.
+5. Waits for the database to be ready (up to 25 min), then verifies the host can connect to it via SQLcl (so a broken local SQLcl/Java setup fails fast with a real error message).
+6. Runs `./scripts/after-first-db-start.sh` non-interactively — installs APEX, applies dev-friendly defaults (disables archive logs, relaxes APEX password rules), and sets the APEX `INTERNAL`/`ADMIN` password to the same `ORACLE_PASSWORD` value from `.env`. The ORDS container finishes its own first-boot install in parallel during this step.
+7. Waits for ORDS to finish its first-boot install (up to 15 min) and sets the ORDS PL/SQL gateway mode to `proxied` (the recommended setting for APEX).
 8. Restarts the ORDS container so it picks up the new APEX module + config change, and waits for it to come back.
+
+If any wait times out, the installer prints the relevant container logs and exits — re-running `./install.sh` is safe and picks up where it left off.
 
 </details>
 
