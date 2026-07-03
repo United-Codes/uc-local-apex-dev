@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# desc: Shrink tablespaces and datafiles to reclaim unused space
 
 set -e
 
@@ -276,4 +277,9 @@ FROM dba_data_files
 ;
 SQL
 
-echo "Resource to further optimize space usage: https://connor-mcdonald.com/2023/12/18/the-ultimate-database-free-edition/"
+echo "This only reclaims unused space. To also shrink the data itself, enable"
+echo "Advanced Compression on a schema's tablespace: compress-space <schema>"
+
+echo "Thanks to Connor McDonald for his blog post on space efficiently using the Free Edition: https://connor-mcdonald.com/2023/12/18/the-ultimate-database-free-edition/"
+
+echo "If you are using Vector Indexes, take a look at Connor McDonald's blog post on partition_large_extents: https://connor-mcdonald.com/2025/03/10/vectors-in-oracle-database-23ai-free/"

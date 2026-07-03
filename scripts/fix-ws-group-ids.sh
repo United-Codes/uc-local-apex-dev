@@ -1,4 +1,5 @@
 #!/bin/bash
+# desc: Remove problematic group IDs from workspace exports in ./backups/import
 
 # Script to remove group_ids values from APEX workspace export files
 # This fixes the issue where group IDs from one instance don't match another

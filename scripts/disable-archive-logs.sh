@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# desc: Disable archive logging to save disk space
 
 # special thanks to philipp salvisberg (https://github.com/United-Codes/uc-local-apex-dev/issues/5)
 

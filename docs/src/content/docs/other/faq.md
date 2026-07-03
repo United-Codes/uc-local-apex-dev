@@ -37,7 +37,7 @@ If you are experienced and don't want to wait you can modify the `docker-compose
 - Run the following command:
 
 ```sh
-sql -name local-23ai-sys @catpatch.sql
+sql -name local-26ai-sys @catpatch.sql
 ```
 
 To update the APEX images (assets):

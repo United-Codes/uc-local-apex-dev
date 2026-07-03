@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# desc: Install the DBMS_CLOUD package into the database
 
 set -e
 

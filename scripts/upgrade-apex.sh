@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# desc: Download the latest APEX version and upgrade the installation
 
 set -e
 

@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# desc: Restore a schema from a previous backup (creates the user if missing)
 
 set -e
 

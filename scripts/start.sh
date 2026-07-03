@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# desc: Start the database and ORDS containers
 
 set -e
 

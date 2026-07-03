@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# desc: Install APEX and apply dev-friendly DB defaults (run once after first DB start)
 
 set -e
 

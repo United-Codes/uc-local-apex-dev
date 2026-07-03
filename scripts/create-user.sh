@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# desc: Create a DB schema + APEX workspace with dev grants (--skip-workspace, --compress)
 
 set -e
 
@@ -9,16 +10,16 @@ source ./scripts/util/user_in_env.sh
 source ./scripts/util/user-exists-in-db.sh
 
 skip_workspace=false
+compress=false
 
 usage() {
-  echo "Usage: $0  <schema_name> < --skip_workspace>"
+  echo "Usage: $0 <schema_name> [--skip-workspace] [--compress]"
   exit 1
 }
 
 # check parameter is passed
 if [ -z "$1" ]; then
-  echo "Usage: $0 <schema_name> < --skip_workspace>"
-  exit 1
+  usage
 fi
 USERNAME=$1
 
@@ -29,23 +30,42 @@ if [[ "$USERNAME" == *"-"* ]]; then
 fi
 shift # Remove schema_name from argument list
 
-# Process remaining arguments for --skip-workspace
+# Process remaining arguments
 while [[ $# -gt 0 ]]; do
   case $1 in
   --skip-workspace)
     skip_workspace=true
     shift
     ;;
+  --compress)
+    compress=true
+    shift
+    ;;
   *)
     echo "Error: Unknown parameter '$1'"
-    echo "Usage: $0 <schema_name> [--skip-workspace]"
-    exit 1
+    usage
     ;;
   esac
 done
 
 USERNAME_UPPER=$(echo "$USERNAME" | tr '[:lower:]' '[:upper:]')
 USERNAME_LOWER=$(echo "$USERNAME" | tr '[:upper:]' '[:lower:]')
+
+# When --compress is given, set Advanced Compression defaults on the new
+# tablespace so every segment created in it is born compressed (advanced row
+# compression for tables, advanced index compression for B-tree indexes). The
+# schema is empty at this point, so only the defaults are needed -- no rebuild.
+# Use compress-space.sh to apply the same to a schema that already has data.
+#
+# Both the TABLE and INDEX clauses MUST be set in a single ALTER: each
+# ALTER TABLESPACE ... DEFAULT replaces the whole default spec, so a separate
+# index-only ALTER would silently reset the table default back to NOCOMPRESS.
+COMPRESS_DEFAULTS=""
+if [ "$compress" = true ]; then
+  COMPRESS_DEFAULTS="
+  alter tablespace tbs_${USERNAME_LOWER} default table compress for oltp index compress advanced low;
+"
+fi
 
 # if user exists in .env file
 if user_in_env_bool "$USERNAME"; then
@@ -77,7 +97,7 @@ sql -name "$DB_CONN_NAME" <<SQL
       size 10M
       reuse
       autoextend on next 2M;
-
+${COMPRESS_DEFAULTS}
   create user ${USERNAME}
     identified by "${USER_PASSWORD}"
     default tablespace tbs_${USERNAME_LOWER}

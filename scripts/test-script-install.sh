@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# desc: Run a SQL script in a clean test schema and report results
 
 set -e
 

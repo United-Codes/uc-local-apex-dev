@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# desc: Install an APEX app export into a clean test schema and report results
 
 set -e
 

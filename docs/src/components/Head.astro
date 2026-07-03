@@ -2,6 +2,34 @@
 import type { Props } from '@astrojs/starlight/props';
 import Default from '@astrojs/starlight/components/Head.astro';
 
+const SITE_TITLE = 'uc-local-apex-dev';
+
+// Starlight emits bare page titles for og:title / twitter:title. Append the
+// site title so social media previews match the browser <title> format.
+const route = Astro.locals.starlightRoute;
+route.head = route.head.map((entry) => {
+  const isSocialTitle =
+    entry.tag === 'meta' &&
+    (entry.attrs?.property === 'og:title' ||
+      entry.attrs?.name === 'twitter:title');
+
+  if (
+    isSocialTitle &&
+    typeof entry.attrs?.content === 'string' &&
+    !entry.attrs.content.endsWith(`| ${SITE_TITLE}`)
+  ) {
+    return {
+      ...entry,
+      attrs: {
+        ...entry.attrs,
+        content: `${entry.attrs.content} | ${SITE_TITLE}`,
+      },
+    };
+  }
+
+  return entry;
+});
+
 // JSON-LD structured data for UC AI library/SDK
 const jsonLd = {
   "@context": "https://schema.org",

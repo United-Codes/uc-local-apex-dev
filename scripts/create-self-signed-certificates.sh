@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# desc: Create self-signed SSL certificates so ORDS serves HTTPS (run with sudo)
 
 set -e
 

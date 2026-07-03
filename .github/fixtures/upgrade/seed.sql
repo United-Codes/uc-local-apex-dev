@@ -191,6 +191,24 @@ as
     from employees
    group by dept_id;
 
+-- ---------------------------------------------------------------------------
+-- Advanced-compressed table + index: a compressed segment is a distinct
+-- on-disk storage format, so this asserts that compression survives an
+-- in-place Oracle DB upgrade intact (verify.sql re-reads the attributes).
+-- ---------------------------------------------------------------------------
+create table compressed_events (
+  id   number generated always as identity primary key,
+  grp  varchar2(20) not null,
+  note varchar2(200)
+) row store compress advanced;
+
+create index idx_comp_events on compressed_events (grp, id) compress advanced low;
+
+insert into compressed_events (grp, note)
+  select 'g' || mod(level, 5), rpad('x', 200, 'x')
+    from dual connect by level <= 500;
+commit;
+
 prompt Upgrade-test schema seeded
 
 exit

@@ -35,7 +35,7 @@ rm -rf ./META-INF || true
 
 ```sh
 cd apex
-sql -name local-23ai-sys @apexins.sql TBS_APEX TBS_APEX TEMP /i/
+sql -name local-26ai-sys @apexins.sql TBS_APEX TBS_APEX TEMP /i/
 exit;
 ```
 
@@ -44,6 +44,7 @@ exit;
 ```sh
 cd apex
 sql -name local-23ai-sys @apexins.sql SYSAUX SYSAUX TEMP /i/
+# (the connection is named local-23ai-sys on old 23ai installs)
 exit;
 ```
 

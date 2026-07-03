@@ -1,4 +1,5 @@
 set -e
+# desc: DataPump-export all schemas incl. APEX workspaces, apps and ORDS modules
 
 source ./scripts/util/load_env.sh
 source ./scripts/util/read_user_names.sh

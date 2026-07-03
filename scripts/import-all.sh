@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# desc: Import every export file found in ./backups/import
 
 set -e
 

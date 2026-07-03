@@ -1,6 +1,6 @@
 ---
 title: Init podman on MacOS
-description: Getting started with Podman on macOS for Oracle 23ai development
+description: Getting started with Podman on macOS for Oracle 26ai development
 sidebar:
     order: 10
 ---
@@ -10,7 +10,11 @@ sidebar:
 You need the [homebrew](https://brew.sh/) package manager for this:
 
 ```sh
-brew install docker docker-compose sqlcl
+brew install sqlcl
+
+# Optional: only if you want to use the docker CLI
+# against Podman's Docker-compatible socket
+brew install docker docker-compose
 ```
 
 Upgrade tolerant way of adding SQLcl to your PATH (add it to your ~/.bashrc or ~/.zshrc):
@@ -100,5 +104,5 @@ podman machine stop
 But I recommend stopping the database before stopping the Podman machine:
 
 ```sh
-local-23ai.sh stop
+local-26ai.sh stop
 ```
