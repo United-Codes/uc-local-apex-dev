@@ -31,9 +31,8 @@ echo "Downloading Oracle Cloud certificates to $TEMP_DIR"
 
 curl -o "$TEMP_DIR/dbc_certs.tar" "https://objectstorage.us-phoenix-1.oraclecloud.com/p/KB63IAuDCGhz_azOVQ07Qa_mxL3bGrFh1dtsltreRJPbmb-VwsH2aQ4Pur2ADBMA/n/adwcdemo/b/CERTS/o/dbc_certs.tar"
 
-cd "$TEMP_DIR"
-tar -xf dbc_certs.tar
-rm dbc_certs.tar
+tar -xf "$TEMP_DIR/dbc_certs.tar" -C "$TEMP_DIR"
+rm "$TEMP_DIR/dbc_certs.tar"
 echo "Certificates extracted to $TEMP_DIR"
 
 # create wallet directory
@@ -81,7 +80,8 @@ echo "Wallet created and certificates added successfully."
 echo "================"
 
 
-sql sys/"$ORACLE_PASSWORD"@localhost:1521/FREE as SYSDBA <<EOF
+# Network/wallet ACLs are per-PDB — grant them where DBMS_CLOUD is actually used.
+sql -name "$DB_CONN_NAME" <<EOF
 begin
   -- Allow all hosts for HTTP/HTTP_PROXY
   sys.dbms_network_acl_admin.append_host_ace(
@@ -104,17 +104,24 @@ begin
 end;
 /
 
-alter database property set ssl_wallet='file:/opt/oracle/oradata/wallets/ssl'
+exit
+EOF
 
+# ssl_wallet is a database-wide property and must be set in the CDB root
+# (ORA-65040 when run from a PDB).
+sql sys/"$ORACLE_PASSWORD"@localhost:"$DBPORT"/FREE as SYSDBA <<EOF
+alter database property set ssl_wallet='file:/opt/oracle/oradata/wallets/ssl';
 
 exit
 EOF
 
-sql -name local-23ai-sys <<EOF
-  shutdown immediate;
-  startup;
-
-  exit
-EOF
+# Restart the whole instance (not just the PDB) from inside the container:
+# a network connection cannot reconnect for startup after shutdown (ORA-12514).
+$CONTAINER_CLI exec "$CONTAINER_NAME" bash -c 'source /home/oracle/.bashrc 2>/dev/null; $ORACLE_HOME/bin/sqlplus -S / as sysdba <<EOF
+shutdown immediate;
+startup;
+alter pluggable database all open;
+exit
+EOF'
 
 echo "Database restarted to apply wallet settings."
