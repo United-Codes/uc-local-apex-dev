@@ -43,7 +43,7 @@ services:
     depends_on:
       26ai:
         condition: service_healthy
-    image: container-registry.oracle.com/database/ords:26.1.2
+    image: container-registry.oracle.com/database/ords:26.2.0
     container_name: local-26ai-ords
 
 networks:
