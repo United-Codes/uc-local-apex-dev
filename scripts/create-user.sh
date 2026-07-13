@@ -126,6 +126,7 @@ ${COMPRESS_DEFAULTS}
   grant create any context to ${USERNAME};
   grant create mle to ${USERNAME};
   grant create property graph to ${USERNAME};
+  grant create assertion to ${USERNAME};
   grant execute dynamic mle to ${USERNAME};
 
   grant execute on dbms_crypto to ${USERNAME};
