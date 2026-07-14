@@ -9,7 +9,7 @@ services:
       - oradata-26ai:/opt/oracle/oradata
     restart: no
     healthcheck:
-      #test: ["CMD", "healthcheck.sh"]
+      test: ["CMD-SHELL", "/opt/oracle/checkDBStatus.sh >/dev/null 2>&1 || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 10
