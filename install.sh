@@ -84,6 +84,8 @@ fi
 
 echo "Using container engine: $CONTAINER_CLI"
 echo "Using compose command: $DOCKER_COMPOSE"
+echo "SQLcl version:"
+sql -V || true
 
 # ---------------------------------------------------------------------------
 # 2. .env handling
@@ -164,7 +166,7 @@ while (( SECONDS < deadline )); do
   # which is why only podman hung. The capture + case match avoids the pipe.
   db_log=$($DOCKER_COMPOSE logs 26ai 2>&1 || true)
   case "$db_log" in
-  *"DATABASE IS READY TO USE!"*)
+  *"DATABASE IS READY TO USE"*)
     echo "Database is ready."
     db_ready=true
     break
@@ -200,7 +202,12 @@ select 1 from dual;
 exit
 SQL
   )
-  if [ "$(printf '%s' "$conn_out" | tr -d '[:space:]')" = "1" ]; then
+  # SQLcl on Java 24+ can prepend JVM noise on stderr -- either a
+  # "Picked up JAVA_TOOL_OPTIONS: ..." line (env var set) or a multi-line
+  # "WARNING: restricted method ..." block (env var not set) -- and the 2>&1
+  # above folds it into conn_out. Match a standalone "1" line rather than
+  # squishing the whole blob, so leading noise no longer defeats the check.
+  if printf '%s\n' "$conn_out" | grep -qxE '[[:space:]]*1[[:space:]]*'; then
     echo "Host database connection works."
     db_conn_ok=true
     break
@@ -246,7 +253,7 @@ deadline=$((SECONDS + 900))
 progress_at=$((SECONDS + 60))
 ords_ready=false
 while (( SECONDS < deadline )); do
-  count=$(ords_query 2>/dev/null | tr -d '[:space:]' || true)
+  count=$(ords_query 2>/dev/null | grep -oE '[0-9]+' | head -1 || true)
   if [ "$count" = "1" ]; then
     echo "ORDS is ready."
     ords_ready=true
@@ -314,12 +321,12 @@ banner "Done"
 cat <<EOF
 The stack is up and APEX is installed.
 
-  APEX:           https://localhost:8443/ords/
+  APEX:           https://localhost:8181/ords/
   APEX workspace: INTERNAL / ADMIN / (your ORACLE_PASSWORD from .env)
   SYS connection: sql -name "\$DB_CONN_NAME"   (after sourcing scripts/util/load_env.sh)
 
 Next: create a workspace + schema for your app:
 
-  ./scripts/create-user.sh <NAME>
+  ./local-26ai.sh create-user <NAME>
 
 EOF
