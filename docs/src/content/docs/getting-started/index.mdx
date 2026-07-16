@@ -25,7 +25,7 @@ Recommended minimum:
 
 - **4GB RAM**
 - **3 CPUs**
-- **20GB disk space**
+- **35GB disk space**
 
 [Learn more about Oracle container requirements](https://hartenfeller.dev/blog/oracle-23ai-container-wont-start-mac)
 
@@ -98,20 +98,21 @@ CONTAINER_CLI=podman ./install.sh
   compose provider), not the standalone `podman-compose` — the latter doesn't
   support everything in this project's `docker-compose.yml`.
 
-  The provider talks to Podman's API socket. If `podman compose` fails with
-  _"Cannot connect to the Docker daemon at unix:///run/user/.../podman/podman.sock"_,
-  enable the rootless socket:
+The provider talks to Podman's API socket. If `podman compose` fails with
+_"Cannot connect to the Docker daemon at unix:///run/user/.../podman/podman.sock"_,
+enable the rootless socket:
 
-  ```bash
-  systemctl --user enable --now podman.socket
-  ```
+```bash
+systemctl --user enable --now podman.socket
+```
 
-  On a **headless server you use over SSH**, also enable lingering so the
-  socket survives after you log out:
+On a **headless server you use over SSH**, also enable lingering so the
+socket survives after you log out:
 
-  ```bash
-  loginctl enable-linger "$USER"
-  ```
+```bash
+loginctl enable-linger "$USER"
+```
+
 </Aside>
 
 ### 4. Log into APEX
