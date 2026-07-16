@@ -9,7 +9,8 @@ services:
       - oradata-26ai:/opt/oracle/oradata
     restart: no
     healthcheck:
-      test: ["CMD-SHELL", "/opt/oracle/checkDBStatus.sh >/dev/null 2>&1 || exit 1"]
+      test:
+        ["CMD-SHELL", "/opt/oracle/checkDBStatus.sh >/dev/null 2>&1 || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -43,7 +44,7 @@ services:
     depends_on:
       26ai:
         condition: service_healthy
-    image: container-registry.oracle.com/database/ords:26.2.0
+    image: container-registry.oracle.com/database/ords:26.2.1
     container_name: local-26ai-ords
 
 networks:
