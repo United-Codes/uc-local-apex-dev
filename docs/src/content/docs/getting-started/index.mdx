@@ -80,6 +80,8 @@ The installer does the full bootstrap end-to-end: it generates an `.env` file wi
 7. Waits for ORDS to finish its first-boot install (up to 15 min) and sets the ORDS PL/SQL gateway mode to `proxied` (the recommended setting for APEX).
 8. Restarts the ORDS container so it picks up the new APEX module + config change, and waits for it to come back.
 
+When run with `--secure` (see below), it additionally disables the ORDS Database REST API, MongoDB API, SQL Developer Web / Database Actions and debug-to-screen before the restart, and records `FORCE_SECURE="true"` in `.env`.
+
 If any wait times out, the installer prints the relevant container logs and exits — re-running `./install.sh` is safe and picks up where it left off.
 
 </details>
@@ -90,6 +92,36 @@ If you have both Docker and Podman installed and want to force one, set `CONTAIN
 ```bash
 CONTAINER_CLI=podman ./install.sh
 ```
+
+</Aside>
+
+<Aside type="caution" title="Hosting a test DB: --secure">
+This stack is built for **local** development and is intentionally insecure by
+default. If you want to host it somewhere reachable as a **test** database (never
+production), install with the `--secure` flag:
+
+```bash
+./install.sh --secure
+```
+
+Secure mode does exactly two things:
+
+- **Disables the ORDS surfaces reachable without app authentication**: the ORDS
+  Database REST API (`database.api.enabled`), the MongoDB API (`mongo.enabled`),
+  SQL Developer Web / Database Actions (`feature.sdw`, `/ords/sql-developer`) and
+  debug-to-screen (`debug.printDebugToScreen`). The APEX runtime and login keep
+  working.
+- **Uses the random `ORACLE_PASSWORD` for new workspaces** created with
+  `create-user`, instead of the shared `Welcome_1`. (Equivalent to setting
+  [`WORKSPACE_USE_INTERNAL_PASSWORD=true`](/products/uc-local-apex-dev/docs/getting-started/creating-users/).)
+
+It sets `FORCE_SECURE="true"` in `.env`, so later `create-user` runs stay
+consistent. Re-running `./install.sh --secure` on an existing install is safe.
+
+**Secure mode does _not_** restrict network/port exposure and does _not_ rotate
+the plaintext secrets in `.env` / `ords-secrets/conn_string.txt`. Before hosting:
+put the stack behind a firewall + TLS reverse proxy, rotate those secrets, and
+remove any stale `.env_old`.
 
 </Aside>
 
@@ -173,6 +205,6 @@ Once setup is complete, you can access:
 ### Default APEX Credentials
 
 - **INTERNAL workspace**: `ADMIN` / value of `ORACLE_PASSWORD` in `.env`
-- **Your own workspaces** (created with `create-user`): `ADMIN` or the schema name / `Welcome_1`
+- **Your own workspaces** (created with `create-user`): `ADMIN` or the schema name / `Welcome_1` (or the value of `ORACLE_PASSWORD` when `WORKSPACE_USE_INTERNAL_PASSWORD=true` in `.env`)
 
 The database schema password is different from the APEX login: it's the generated `<NAME>_USER_PASSWORD` value in `.env`.

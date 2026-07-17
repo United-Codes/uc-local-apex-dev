@@ -31,6 +31,14 @@ This will:
   http://localhost:8181/ords/apex
 </Aside>
 
+<Aside type="note" title="Use a random password instead of Welcome_1">
+  By default new workspaces use the shared dev password `Welcome_1`. Set
+  `WORKSPACE_USE_INTERNAL_PASSWORD=true` in your `.env` file to instead reuse the
+  (randomly generated) INTERNAL ADMIN password — i.e. the `ORACLE_PASSWORD` value
+  from `.env`, the same password the APEX Internal workspace `ADMIN` uses. New
+  workspaces created after that will use it for both the `ADMIN` and schema users.
+</Aside>
+
 ### Create Schema Only
 
 If you only need a database schema without an APEX workspace:

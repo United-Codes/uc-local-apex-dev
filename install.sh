@@ -20,6 +20,41 @@ trap 'echo "::error::install.sh failed during step: $CURRENT_STEP" >&2' ERR
 
 cd "$(dirname "${BASH_SOURCE[0]}")"
 
+# ---------------------------------------------------------------------------
+# 0. Parse arguments
+# ---------------------------------------------------------------------------
+# --secure enables a hardened install suitable for a hosted TEST db (not prod):
+# it turns off the ORDS surfaces that are reachable without app authentication
+# (Database REST API, MongoDB API, SQL Developer Web / Database Actions, and
+# debug-to-screen) and makes new workspaces use the random INTERNAL password
+# instead of the shared 'Welcome_1'. It does NOT touch network/port exposure --
+# front the stack with your own firewall + TLS reverse proxy.
+SECURE=false
+
+usage() {
+  echo "Usage: $0 [--secure]"
+  echo
+  echo "  --secure   Harden the install for a hosted test DB (disables ORDS admin"
+  echo "             surfaces, uses the random INTERNAL password for workspaces)."
+  exit 1
+}
+
+while [[ $# -gt 0 ]]; do
+  case $1 in
+  --secure)
+    SECURE=true
+    shift
+    ;;
+  -h | --help)
+    usage
+    ;;
+  *)
+    echo "Error: Unknown parameter '$1'" >&2
+    usage
+    ;;
+  esac
+done
+
 banner() {
   CURRENT_STEP="$1"
   echo
@@ -124,6 +159,18 @@ if [ -f .env ]; then
 else
   echo "No .env found — running setup.sh."
   ./setup.sh
+fi
+
+# When --secure is given, persist it into .env as FORCE_SECURE=true so that both
+# this install and later `create-user` runs pick up the hardened behavior. The
+# key always exists (setup.sh seeds it, and it is validated above), so we update
+# it in place rather than append a duplicate.
+if [ "$SECURE" = true ]; then
+  echo "Secure mode: setting FORCE_SECURE=\"true\" in .env"
+  # Portable in-place edit (BSD/macOS + GNU sed): write to a temp file, move back.
+  tmp_env=$(mktemp)
+  sed 's/^FORCE_SECURE=.*/FORCE_SECURE="true"/' .env >"$tmp_env"
+  mv "$tmp_env" .env
 fi
 
 # Pull in $ORACLE_PASSWORD, the sql() TTY wrapper, and (again) $DOCKER_COMPOSE.
@@ -293,6 +340,25 @@ $CONTAINER_CLI exec local-26ai-ords bash -c \
   "ords --config /etc/ords/config config --db-pool default set plsql.gateway.mode proxied"
 
 # ---------------------------------------------------------------------------
+# 9b. (secure) Disable ORDS surfaces reachable without app authentication
+# ---------------------------------------------------------------------------
+# Only in --secure mode: turn off the ORDS admin/management surfaces that are
+# otherwise exposed on a hosted instance. The APEX runtime + gateway keep
+# working; only these extra surfaces are removed. Applied via the same
+# `ords config` CLI as the gateway step so it lands in the mounted config, and
+# the restart below makes it take effect. Idempotent.
+if [ "$SECURE" = true ]; then
+  banner "Secure mode: disable ORDS Database API, MongoDB API, SQL Developer Web, debug-to-screen"
+  $CONTAINER_CLI exec local-26ai-ords bash -c '
+    set -e
+    ords --config /etc/ords/config config set database.api.enabled false
+    ords --config /etc/ords/config config set mongo.enabled false
+    ords --config /etc/ords/config config set debug.printDebugToScreen false
+    ords --config /etc/ords/config config --db-pool default set feature.sdw false
+  '
+fi
+
+# ---------------------------------------------------------------------------
 # 10. Restart ORDS so it picks up APEX + the config change
 # ---------------------------------------------------------------------------
 banner "Restart ORDS to pick up APEX module"
@@ -330,3 +396,17 @@ Next: create a workspace + schema for your app:
   ./local-26ai.sh create-user <NAME>
 
 EOF
+
+if [ "$SECURE" = true ]; then
+  cat <<'EOF'
+Secure mode (FORCE_SECURE=true) is enabled:
+  - ORDS Database REST API, MongoDB API, SQL Developer Web / Database Actions,
+    and debug-to-screen are DISABLED.
+  - New workspaces (create-user) use the random ORACLE_PASSWORD, not 'Welcome_1'.
+
+This does NOT restrict network/port exposure and does NOT rotate the plaintext
+secrets in .env / ords-secrets/conn_string.txt. Before hosting: put the stack
+behind a firewall + TLS reverse proxy.
+
+EOF
+fi
