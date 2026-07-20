@@ -190,13 +190,13 @@ fi
 # this install and later `create-user` runs pick up the hardened behavior. We use
 # our own key name (NOT the Oracle ORDS image's FORCE_SECURE, which the image
 # entrypoint would read from this shared env_file and then refuse to boot without
-# TLS certs). We also turn ORDS_DEBUG off so debug-to-screen stays disabled across
-# restarts. Both keys always exist (setup.sh seeds them, SECURE_MODE is validated
-# above), so we update in place rather than append duplicates.
+# TLS certs). We also turn DEBUG_TO_SCREEN off so debug-to-screen stays disabled
+# across restarts. Both keys always exist (setup.sh seeds them, SECURE_MODE is
+# validated above), so we update in place rather than append duplicates.
 if [ "$SECURE" = true ]; then
-  echo "Secure mode: setting SECURE_MODE=\"true\" and ORDS_DEBUG=\"false\" in .env"
+  echo "Secure mode: setting SECURE_MODE=\"true\" and DEBUG_TO_SCREEN=\"false\" in .env"
   set_env_kv SECURE_MODE true
-  set_env_kv ORDS_DEBUG false
+  set_env_kv DEBUG_TO_SCREEN false
 fi
 
 # Pull in $ORACLE_PASSWORD, the sql() TTY wrapper, and (again) $DOCKER_COMPOSE.
@@ -398,8 +398,9 @@ $CONTAINER_CLI exec local-26ai-ords bash -c \
 #   - mongo.enabled: the ORDS image entrypoint runs `ords config set mongo.enabled
 #     true` on every boot, so setting it false is cosmetic. The MongoDB API is
 #     closed instead by NOT publishing its port (27017 is not in docker-compose).
-#   - debug.printDebugToScreen: driven by the DEBUG env var (ORDS_DEBUG in .env,
-#     set to false above in secure mode), which the image re-applies every boot.
+#   - debug.printDebugToScreen: driven by the DEBUG env var (DEBUG_TO_SCREEN in
+#     .env, set to false above in secure mode), which the image re-applies every
+#     boot.
 if [ "$SECURE" = true ]; then
   banner "Secure mode: disable ORDS Database API, SQL Developer Web / Database Actions"
   $CONTAINER_CLI exec local-26ai-ords bash -c '
@@ -452,7 +453,7 @@ if [ "$SECURE" = true ]; then
   cat <<'EOF'
 Secure mode (SECURE_MODE=true) is enabled:
   - ORDS Database REST API and SQL Developer Web / Database Actions are DISABLED.
-  - Debug-to-screen is off (ORDS_DEBUG=false in .env).
+  - Debug-to-screen is off (DEBUG_TO_SCREEN=false in .env).
   - The MongoDB API is closed because its port (27017) is not published.
   - New workspaces (create-user) use the random ORACLE_PASSWORD, not 'Welcome_1'.
 

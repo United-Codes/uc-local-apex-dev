@@ -27,8 +27,11 @@ echo "DBPORT=\"1521\"" >>.env
 # Deliberately NOT named FORCE_SECURE: the Oracle ORDS image reads FORCE_SECURE
 # from this shared env_file and would refuse to boot without TLS certs.
 echo "SECURE_MODE=\"false\"" >>.env
-# ORDS debug-to-screen. Default on for dev; install.sh --secure flips it to false.
-echo "ORDS_DEBUG=\"true\"" >>.env
+# ORDS debug-to-screen (maps to the container's DEBUG env in docker-compose.yml).
+# Default on for dev; install.sh --secure flips it to false. NOT named ORDS_DEBUG:
+# that is a reserved variable inside the ORDS image's `ords` launcher (it holds
+# JVM -agentlib:jdwp options) and setting it here breaks the ORDS install.
+echo "DEBUG_TO_SCREEN=\"true\"" >>.env
 
 echo "Created .env file"
 

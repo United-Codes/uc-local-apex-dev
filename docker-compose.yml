@@ -41,9 +41,10 @@ services:
       - ./.env
     environment:
       # ORDS maps DEBUG -> debug.printDebugToScreen on every boot. Interpolated
-      # from .env (ORDS_DEBUG) so `install.sh --secure` can persistently turn it
-      # off; defaults on for dev.
-      - DEBUG=${ORDS_DEBUG:-true}
+      # from .env (DEBUG_TO_SCREEN) so `install.sh --secure` can persistently turn
+      # it off; defaults on for dev. NB: do not name the .env key ORDS_DEBUG --
+      # that is reserved inside the ORDS launcher (JVM -agentlib:jdwp options).
+      - DEBUG=${DEBUG_TO_SCREEN:-true}
     depends_on:
       26ai:
         condition: service_healthy
