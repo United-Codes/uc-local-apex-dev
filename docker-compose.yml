@@ -7,7 +7,7 @@ services:
       - ./.env
     volumes:
       - oradata-26ai:/opt/oracle/oradata
-    restart: "no"
+    restart: "${RESTART_POLICY:-no}"
     healthcheck:
       test:
         ["CMD-SHELL", "/opt/oracle/checkDBStatus.sh >/dev/null 2>&1 || exit 1"]
@@ -36,11 +36,14 @@ services:
         bind:
           selinux: z
           create_host_path: true
-    restart: "no"
+    restart: "${RESTART_POLICY:-no}"
     env_file:
       - ./.env
     environment:
-      - DEBUG=true
+      # ORDS maps DEBUG -> debug.printDebugToScreen on every boot. Interpolated
+      # from .env (ORDS_DEBUG) so `install.sh --secure` can persistently turn it
+      # off; defaults on for dev.
+      - DEBUG=${ORDS_DEBUG:-true}
     depends_on:
       26ai:
         condition: service_healthy

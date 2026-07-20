@@ -55,8 +55,8 @@ USERNAME_LOWER=$(echo "$USERNAME" | tr '[:upper:]' '[:lower:]')
 # well-known shared dev password 'Welcome_1'. Set WORKSPACE_USE_INTERNAL_PASSWORD=true
 # in .env to instead reuse the (randomly generated) INTERNAL ADMIN password, i.e.
 # ORACLE_PASSWORD, which is what the APEX Internal workspace ADMIN also uses.
-# A secure install (FORCE_SECURE=true, set by `install.sh --secure`) implies this.
-if [ "${WORKSPACE_USE_INTERNAL_PASSWORD:-false}" = "true" ] || [ "${FORCE_SECURE:-false}" = "true" ]; then
+# A secure install (SECURE_MODE=true, set by `install.sh --secure`) implies this.
+if [ "${WORKSPACE_USE_INTERNAL_PASSWORD:-false}" = "true" ] || [ "${SECURE_MODE:-false}" = "true" ]; then
   if [ -z "${ORACLE_PASSWORD:-}" ]; then
     echo "Error: WORKSPACE_USE_INTERNAL_PASSWORD=true but ORACLE_PASSWORD is not set in .env"
     exit 1

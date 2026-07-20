@@ -8,8 +8,11 @@ source ./scripts/util/get_ws_settings.sh
 
 echo "Downloading APEX"
 
+# Only clear the download staging dir here. Do NOT wipe ./apex-images up front:
+# if a later step fails, a pre-emptive delete leaves the running ORDS with no
+# static files (/i/). apex-images is repopulated from the fresh ./apex only after
+# apexins.sql succeeds (below).
 rm -rf ./apex || true
-rm -rf ./apex-images || true
 
 APEX_URL="https://download.oracle.com/otn_software/apex/apex-latest.zip"
 if command -v curl >/dev/null 2>&1; then
@@ -36,7 +39,12 @@ SQL
 cd ..
 
 echo "Configure APEX images"
+# APEX install succeeded above -- now it is safe to refresh the served images.
+# Clear the target's CONTENTS (not the dir itself) so removed/renamed files from
+# an older version don't linger, while keeping the directory inode and its perms
+# intact -- it is a live bind-mount source for the ORDS container.
 mkdir -p ./apex-images
+find ./apex-images -mindepth 1 -delete
 cp -R ./apex/images/. ./apex-images/
 
 echo "Configuring INTERNAL workspace settings"

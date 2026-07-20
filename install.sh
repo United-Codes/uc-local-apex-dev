@@ -25,10 +25,12 @@ cd "$(dirname "${BASH_SOURCE[0]}")"
 # ---------------------------------------------------------------------------
 # --secure enables a hardened install suitable for a hosted TEST db (not prod):
 # it turns off the ORDS surfaces that are reachable without app authentication
-# (Database REST API, MongoDB API, SQL Developer Web / Database Actions, and
-# debug-to-screen) and makes new workspaces use the random INTERNAL password
-# instead of the shared 'Welcome_1'. It does NOT touch network/port exposure --
-# front the stack with your own firewall + TLS reverse proxy.
+# (Database REST API, SQL Developer Web / Database Actions, and debug-to-screen;
+# the MongoDB API is closed by not publishing its port) and makes new workspaces
+# use the random INTERNAL password instead of the shared 'Welcome_1'. It records
+# this as SECURE_MODE=true in .env (NOT FORCE_SECURE, which the Oracle ORDS image
+# reads itself). It does NOT touch network/port exposure -- front the stack with
+# your own firewall + TLS reverse proxy.
 SECURE=false
 
 usage() {
@@ -66,6 +68,20 @@ fail_resumable() {
   echo >&2
   echo "You can safely re-run ./install.sh — it picks up where it left off." >&2
   exit 1
+}
+
+# set_env_kv KEY VALUE — set KEY="VALUE" in .env, updating in place if the key
+# already exists or appending it otherwise. Portable across BSD/macOS + GNU sed.
+set_env_kv() {
+  local key="$1" value="$2"
+  if grep -qE "^${key}=" .env; then
+    local tmp_env
+    tmp_env=$(mktemp)
+    sed "s/^${key}=.*/${key}=\"${value}\"/" .env >"$tmp_env"
+    mv "$tmp_env" .env
+  else
+    echo "${key}=\"${value}\"" >>.env
+  fi
 }
 
 # ---------------------------------------------------------------------------
@@ -145,7 +161,7 @@ REQUIRED_ENV_KEYS=(
   DBSERVICENAME
   DBHOST
   DBPORT
-  FORCE_SECURE
+  SECURE_MODE
 )
 
 if [ -f .env ]; then
@@ -170,16 +186,17 @@ else
   ./setup.sh
 fi
 
-# When --secure is given, persist it into .env as FORCE_SECURE=true so that both
-# this install and later `create-user` runs pick up the hardened behavior. The
-# key always exists (setup.sh seeds it, and it is validated above), so we update
-# it in place rather than append a duplicate.
+# When --secure is given, persist it into .env as SECURE_MODE=true so that both
+# this install and later `create-user` runs pick up the hardened behavior. We use
+# our own key name (NOT the Oracle ORDS image's FORCE_SECURE, which the image
+# entrypoint would read from this shared env_file and then refuse to boot without
+# TLS certs). We also turn ORDS_DEBUG off so debug-to-screen stays disabled across
+# restarts. Both keys always exist (setup.sh seeds them, SECURE_MODE is validated
+# above), so we update in place rather than append duplicates.
 if [ "$SECURE" = true ]; then
-  echo "Secure mode: setting FORCE_SECURE=\"true\" in .env"
-  # Portable in-place edit (BSD/macOS + GNU sed): write to a temp file, move back.
-  tmp_env=$(mktemp)
-  sed 's/^FORCE_SECURE=.*/FORCE_SECURE="true"/' .env >"$tmp_env"
-  mv "$tmp_env" .env
+  echo "Secure mode: setting SECURE_MODE=\"true\" and ORDS_DEBUG=\"false\" in .env"
+  set_env_kv SECURE_MODE true
+  set_env_kv ORDS_DEBUG false
 fi
 
 # Pull in $ORACLE_PASSWORD, the sql() TTY wrapper, and (again) $DOCKER_COMPOSE.
@@ -200,8 +217,12 @@ banner "Start the stack"
 # These bind-mount sources are gitignored (empty on a fresh checkout). Create
 # them up front so the bind mounts attach cleanly on every engine — Docker used
 # to auto-create them, but with explicit bind options (selinux relabel) that
-# implicit behaviour is no longer guaranteed.
+# implicit behaviour is no longer guaranteed. chmod 777 unconditionally (not just
+# on fresh create): under rootless podman the ORDS container's mapped user must be
+# able to write /etc/ords/config, and setup.sh's chmod is skipped when .env
+# already exists — so ensure the perms here, independent of setup.sh.
 mkdir -p ords-config apex-images
+chmod 777 ords-config apex-images
 $DOCKER_COMPOSE up -d
 
 # ---------------------------------------------------------------------------
@@ -288,9 +309,25 @@ fi
 # them in parallel absorbs slow machines where ORDS alone used to blow the
 # 15-minute budget.
 banner "Run after-first-db-start.sh (installs APEX, applies space optimizations)"
-# Closing stdin makes the archive-logs prompt take its default (Y, disable).
-# The APEX ADMIN password is no longer prompted — it reuses ORACLE_PASSWORD.
-./scripts/after-first-db-start.sh </dev/null
+# Idempotency: after-first-db-start.sh creates tablespaces and runs apexins.sql,
+# neither of which is re-runnable — on an already-installed DB it fails hard (and
+# a previous version wiped apex-images mid-run). Detect an existing APEX install
+# and skip the step so a re-run of install.sh genuinely "picks up where it left
+# off". The versioned APEX schema (e.g. APEX_260100) exists only after apexins.sql
+# has run, so its presence is a reliable "already installed" signal.
+apex_installed=$(sql -S "sys/${ORACLE_PASSWORD}@localhost:1521/FREEPDB1" as SYSDBA <<'SQL' 2>/dev/null | grep -oE '[0-9]+' | head -1 || true
+set heading off feedback off pagesize 0
+select count(*) from dba_users where regexp_like(username, '^APEX_[0-9]+$');
+exit
+SQL
+)
+if [ -n "$apex_installed" ] && [ "$apex_installed" -gt 0 ] 2>/dev/null; then
+  echo "APEX is already installed — skipping after-first-db-start.sh."
+else
+  # Closing stdin makes the archive-logs prompt take its default (Y, disable).
+  # The APEX ADMIN password is no longer prompted — it reuses ORACLE_PASSWORD.
+  ./scripts/after-first-db-start.sh </dev/null
+fi
 
 # ---------------------------------------------------------------------------
 # 8. Wait for ORDS to finish its first-boot install
@@ -356,13 +393,18 @@ $CONTAINER_CLI exec local-26ai-ords bash -c \
 # working; only these extra surfaces are removed. Applied via the same
 # `ords config` CLI as the gateway step so it lands in the mounted config, and
 # the restart below makes it take effect. Idempotent.
+#
+# Only settings that PERSIST are set here. Notably absent:
+#   - mongo.enabled: the ORDS image entrypoint runs `ords config set mongo.enabled
+#     true` on every boot, so setting it false is cosmetic. The MongoDB API is
+#     closed instead by NOT publishing its port (27017 is not in docker-compose).
+#   - debug.printDebugToScreen: driven by the DEBUG env var (ORDS_DEBUG in .env,
+#     set to false above in secure mode), which the image re-applies every boot.
 if [ "$SECURE" = true ]; then
-  banner "Secure mode: disable ORDS Database API, MongoDB API, SQL Developer Web, debug-to-screen"
+  banner "Secure mode: disable ORDS Database API, SQL Developer Web / Database Actions"
   $CONTAINER_CLI exec local-26ai-ords bash -c '
     set -e
     ords --config /etc/ords/config config set database.api.enabled false
-    ords --config /etc/ords/config config set mongo.enabled false
-    ords --config /etc/ords/config config set debug.printDebugToScreen false
     ords --config /etc/ords/config config --db-pool default set feature.sdw false
   '
 fi
@@ -408,9 +450,10 @@ EOF
 
 if [ "$SECURE" = true ]; then
   cat <<'EOF'
-Secure mode (FORCE_SECURE=true) is enabled:
-  - ORDS Database REST API, MongoDB API, SQL Developer Web / Database Actions,
-    and debug-to-screen are DISABLED.
+Secure mode (SECURE_MODE=true) is enabled:
+  - ORDS Database REST API and SQL Developer Web / Database Actions are DISABLED.
+  - Debug-to-screen is off (ORDS_DEBUG=false in .env).
+  - The MongoDB API is closed because its port (27017) is not published.
   - New workspaces (create-user) use the random ORACLE_PASSWORD, not 'Welcome_1'.
 
 This does NOT restrict network/port exposure and does NOT rotate the plaintext
