@@ -30,6 +30,17 @@ compose_install_hint() {
       echo "Install Docker Desktop, which bundles Compose:" >&2
       echo "  https://docs.docker.com/desktop/install/mac-install/" >&2
       echo "or, with Homebrew:  brew install --cask docker" >&2
+      # Common Homebrew gotcha: 'brew install docker-compose' installs the
+      # plugin under /opt/homebrew/lib/docker/cli-plugins, which the docker CLI
+      # does not scan on Apple Silicon -- so 'docker compose' still fails even
+      # though the plugin is installed. Link it into a dir docker does search.
+      if [ -e /opt/homebrew/lib/docker/cli-plugins/docker-compose ]; then
+        echo >&2
+        echo "The Compose plugin appears to be installed via Homebrew but docker" >&2
+        echo "cannot find it. Link it into docker's plugin directory:" >&2
+        echo "  mkdir -p ~/.docker/cli-plugins" >&2
+        echo "  ln -sf /opt/homebrew/lib/docker/cli-plugins/docker-compose ~/.docker/cli-plugins/docker-compose" >&2
+      fi
       ;;
     Linux)
       case "$distro" in
