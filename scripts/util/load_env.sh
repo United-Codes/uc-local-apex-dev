@@ -36,14 +36,14 @@ else
   exit 1
 fi
 
-# Detect its compose command. Use the native 'compose' subcommand; for docker keep the
-# legacy 'docker-compose' v1 fallback. Podman uses ONLY 'podman compose' (no podman-compose).
+# Detect its compose command. ONLY the native '<engine> compose' subcommand is
+# supported -- the standalone 'docker-compose' / 'podman-compose' tools are not.
 if $CONTAINER_CLI compose version &>/dev/null 2>&1; then
   DOCKER_COMPOSE="$CONTAINER_CLI compose"
-elif [ "$CONTAINER_CLI" = "docker" ] && command -v docker-compose &>/dev/null; then
-  DOCKER_COMPOSE="docker-compose"
 else
-  echo "Error: no compose command found for '$CONTAINER_CLI' (podman needs the native 'podman compose' subcommand)"
+  # shellcheck source=scripts/util/compose-hint.sh
+  source "$(dirname "${BASH_SOURCE[0]}")/compose-hint.sh"
+  compose_install_hint "$CONTAINER_CLI"
   exit 1
 fi
 

@@ -73,7 +73,12 @@ fail_resumable() {
 # ---------------------------------------------------------------------------
 banner "Preflight checks"
 
+# OS-aware "how to install the Compose plugin" guidance (compose_install_hint).
+# shellcheck source=scripts/util/compose-hint.sh
+source "$(dirname "${BASH_SOURCE[0]}")/scripts/util/compose-hint.sh"
+
 MISSING=()
+COMPOSE_ENGINE_FOR_HINT=""
 
 for cmd in sql unzip; do
   if ! command -v "$cmd" &>/dev/null; then
@@ -97,16 +102,15 @@ else
   MISSING+=("docker or podman")
 fi
 
-# Detect its compose command. Native '<engine> compose'; docker keeps the legacy
-# 'docker-compose' v1 fallback. Podman uses ONLY 'podman compose' (no podman-compose).
+# Detect its compose command. ONLY the native '<engine> compose' subcommand is
+# supported -- the standalone 'docker-compose' / 'podman-compose' tools are not.
 if [ -z "$CONTAINER_CLI" ]; then
   :
 elif $CONTAINER_CLI compose version &>/dev/null 2>&1; then
   DOCKER_COMPOSE="$CONTAINER_CLI compose"
-elif [ "$CONTAINER_CLI" = "docker" ] && command -v docker-compose &>/dev/null; then
-  DOCKER_COMPOSE="docker-compose"
 else
-  MISSING+=("$CONTAINER_CLI compose (native compose subcommand)")
+  MISSING+=("$CONTAINER_CLI compose plugin")
+  COMPOSE_ENGINE_FOR_HINT="$CONTAINER_CLI"
 fi
 
 if [ ${#MISSING[@]} -gt 0 ]; then
@@ -114,6 +118,11 @@ if [ ${#MISSING[@]} -gt 0 ]; then
   for cmd in "${MISSING[@]}"; do
     echo "  - $cmd" >&2
   done
+  # The engine is present but its Compose plugin is not -- explain how to get it.
+  if [ -n "$COMPOSE_ENGINE_FOR_HINT" ]; then
+    echo >&2
+    compose_install_hint "$COMPOSE_ENGINE_FOR_HINT"
+  fi
   exit 1
 fi
 
