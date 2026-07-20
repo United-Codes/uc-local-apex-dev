@@ -7,7 +7,7 @@ services:
       - ./.env
     volumes:
       - oradata-26ai:/opt/oracle/oradata
-    restart: no
+    restart: "no"
     healthcheck:
       test:
         ["CMD-SHELL", "/opt/oracle/checkDBStatus.sh >/dev/null 2>&1 || exit 1"]
@@ -36,7 +36,7 @@ services:
         bind:
           selinux: z
           create_host_path: true
-    restart: no
+    restart: "no"
     env_file:
       - ./.env
     environment:
