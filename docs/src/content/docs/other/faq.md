@@ -47,3 +47,60 @@ To update the APEX images (assets):
 
 cp -r ./images/* {path_to_your_cloned_repo}/apex-images
 ```
+
+## An APEX upgrade failed halfway. How do I retry it?
+
+If an APEX version upgrade (`apexins.sql`) is interrupted, it can leave the
+database in a half-upgraded state. Typical symptoms:
+
+- `select version_no from apex_release;` still shows the **old** version, but
+- `select comp_id, version, status from dba_registry where comp_id = 'APEX';`
+  shows the **new** version with status `INVALID`, and
+- there are many invalid objects in the new schema:
+  `select owner, count(*) from dba_objects where status = 'INVALID' and owner like 'APEX%' group by owner;`
+
+The good news: the previous APEX schema is left untouched during an upgrade, so
+APEX usually keeps working on the old version while you recover. Retry like this
+(example upgrades to the `APEX_260100` schema — adjust the schema name to the
+version you are installing):
+
+1. **Drop the partial new schema.** A plain re-run of `apexins.sql` fails with
+   `Precondition for Phase 1 failed: APEX_260100 already exists`, so the
+   half-built schema has to go first. APEX schemas are Oracle-maintained, so you
+   need to enable migration mode to drop them:
+
+   ```sh
+   sql -name local-26ai-sys
+   ```
+
+   ```sql
+   alter session set "_oracle_script" = true;
+   drop user APEX_260100 cascade;
+   exit;
+   ```
+
+2. **Re-run the install** from your existing `apex` folder (do not re-download —
+   this keeps the version matching the schema you just dropped):
+
+   ```sh
+   cd apex
+   sql -name local-26ai-sys @apexins.sql TBS_APEX TBS_APEX TEMP /i/
+   cd ..
+   ```
+
+   This takes several minutes. When it finishes, verify:
+
+   ```sql
+   -- both should now show the new version, status VALID, 0 invalid objects
+   select version_no from apex_release;
+   select comp_id, version, status from dba_registry where comp_id = 'APEX';
+   select count(*) from dba_objects where status = 'INVALID';
+   ```
+
+3. **Refresh the APEX images** so the static assets match the new version
+   (a missing image folder shows up as `404` on `/i/...`):
+
+   ```sh
+   find ./apex-images -mindepth 1 -delete
+   cp -R ./apex/images/. ./apex-images/
+   ```
