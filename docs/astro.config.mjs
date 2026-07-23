@@ -65,6 +65,7 @@ export default defineConfig({
 						"getting-started/plsql-debugging",
 						"getting-started/install-apps-scripts",
 						"getting-started/common-tasks",
+						"getting-started/expose-https-reverse-proxy",
 					],
 				},
 				{
