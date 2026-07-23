@@ -65,37 +65,20 @@ sql -name "$DB_CONN_NAME" <<SQL
       from PUBLICSYN where SNAME = 'APEX_UTIL'
      fetch first 1 row only;
 
-    execute IMMEDIATE ' update ' || l_username || q'!.wwv_flow_platform_prefs
-        set VALUE = 604800
-      where NAME = 'MAX_SESSION_IDLE_SEC'
-    !';
-    commit;
-
-    execute IMMEDIATE ' update ' || l_username || q'!.wwv_flow_platform_prefs
-        set VALUE = 604800
-      where NAME = 'MAX_SESSION_LENGTH_SEC'
-    !';
-    commit;
-
-    execute IMMEDIATE ' update ' || l_username || q'!.wwv_flow_platform_prefs
-        set VALUE = 10000
-      where NAME = 'ACCOUNT_LIFETIME_DAYS'
-    !';
-
-    execute IMMEDIATE ' update ' || l_username || q'!.wwv_flow_platform_prefs
-        set VALUE = 3
-      where NAME = 'MAX_APPLICATION_BACKUPS'
-    !';
-    commit;
+    -- Instance-level APEX settings via the supported public API instead of
+    -- poking wwv_flow_platform_prefs directly.
+    apex_instance_admin.set_parameter('MAX_SESSION_IDLE_SEC', 604800);
+    apex_instance_admin.set_parameter('MAX_SESSION_LENGTH_SEC', 604800);
+    -- 9999 is the max ACCOUNT_LIFETIME_DAYS the API allows (validated against
+    -- [1-9][0-9]{0,3}); ~27 years, i.e. effectively never for a dev env.
+    apex_instance_admin.set_parameter('ACCOUNT_LIFETIME_DAYS', 9999);
+    apex_instance_admin.set_parameter('MAX_APPLICATION_BACKUPS', 3);
 
     -- Relax the APEX site-admin password rule so the auto-generated
     -- alphanumeric ORACLE_PASSWORD (used as the INTERNAL ADMIN password by
     -- after-first-db-start.sh) is accepted by apxchpwd. This is a dev-only
     -- environment.
-    execute IMMEDIATE ' update ' || l_username || q'!.wwv_flow_platform_prefs
-        set VALUE = 'N'
-      where NAME = 'STRONG_SITE_ADMIN_PASSWORD'
-    !';
+    apex_instance_admin.set_parameter('STRONG_SITE_ADMIN_PASSWORD', 'N');
     commit;
 
     -- ACL to allow web service requests

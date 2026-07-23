@@ -155,9 +155,28 @@ jobs:
           select 'apex_version: ' || version_no from apex_release;
           select 'workspace_count: ' || count(*) from apex_workspaces;
           select 'apex_internal_admin=' || count(*) from apex_workspace_apex_users where user_name = 'ADMIN' and workspace_name = 'INTERNAL';
+          -- Instance parameters applied by upgrade-apex.sh (via
+          -- apex_instance_admin.set_parameter). Read them back through the
+          -- supported API and assert below. upgrade-apex.sh's SQL heredoc has no
+          -- `whenever sqlerror exit failure`, so a mistyped parameter name there
+          -- would otherwise pass CI green — these asserts are the real guard.
+          -- STRONG_SITE_ADMIN_PASSWORD is deliberately NOT asserted here: it is
+          -- only relaxed transiently so apxchpwd accepts the alphanumeric
+          -- password, and gets reset to the 'Y' default afterwards. Its effect
+          -- is covered instead by the apex_internal_admin=1 check above — if the
+          -- relaxation had failed, apxchpwd would reject the password and ADMIN
+          -- would be missing.
+          select 'p_idle='    || apex_instance_admin.get_parameter('MAX_SESSION_IDLE_SEC')    from dual;
+          select 'p_length='  || apex_instance_admin.get_parameter('MAX_SESSION_LENGTH_SEC')  from dual;
+          select 'p_account=' || apex_instance_admin.get_parameter('ACCOUNT_LIFETIME_DAYS')   from dual;
+          select 'p_backups=' || apex_instance_admin.get_parameter('MAX_APPLICATION_BACKUPS') from dual;
           exit
           SQL
           grep -qx 'apex_internal_admin=1' smoke.out
+          grep -qx 'p_idle=604800'  smoke.out
+          grep -qx 'p_length=604800' smoke.out
+          grep -qx 'p_account=9999'  smoke.out
+          grep -qx 'p_backups=3'     smoke.out
 
       # -----------------------------------------------------------------
       # Script tests — exercise the user-facing scripts against the real
