@@ -5,29 +5,29 @@ sidebar:
   order: 6
 ---
 
-These scripts will use the `UC_TESTINSTALL_1` schema and workspace to install applications or run SQL scripts. This is useful for testing application installs in a clean environment.
+These scripts use the `UC_TESTINSTALL_1` schema and workspace. They install applications or run SQL scripts in a clean environment, so you can test an install many times.
 
 ## Test APEX Application Installs
 
-Test application installations in a clean environment:
+Test an application install in a clean environment:
 
 ```bash
 local-26ai.sh test-app-install ./path/to/my_app.sql
 ```
 
-This will:
+The script does the following:
 
-- Create or clear the `UC_TESTINSTALL_1` schema and workspace
-- Install your application
-- Install any supporting objects (e.g., packages, types, etc.)
-- Provide a summary with:
+- Creates or clears the `UC_TESTINSTALL_1` schema and workspace
+- Installs your application
+- Installs the supporting objects (packages, types, and other objects)
+- Shows a summary with:
   - Object types and counts
-  - List of invalid objects
-  - APEX object dependency scan results
+  - A list of the invalid objects
+  - The results of the APEX dependency scan
 
 ### Skip Confirmation
 
-To skip the confirmation prompt (useful for automation), use the `-y` flag:
+To skip the confirmation prompt, use the `-y` flag. Use this flag in scripts and CI jobs:
 
 ```bash
 local-26ai.sh test-app-install ./path/to/my_app.sql -y
@@ -35,23 +35,23 @@ local-26ai.sh test-app-install ./path/to/my_app.sql -y
 
 ## Test SQL Scripts
 
-Test SQL scripts in a clean environment:
+Test a SQL script in a clean environment:
 
 ```bash
 local-26ai.sh test-script-install ./path/to/sql_script.sql
 ```
 
-This will:
+The script does the following:
 
-- Create or clear the `UC_TESTINSTALL_1` schema and workspace
-- Run your SQL script
-- Provide a summary with:
+- Creates or clears the `UC_TESTINSTALL_1` schema and workspace
+- Runs your SQL script
+- Shows a summary with:
   - Object types and counts
-  - List of invalid objects
+  - A list of the invalid objects
 
 ### Skip Confirmation
 
-To skip the confirmation prompt (useful for automation), use the `-y` flag:
+To skip the confirmation prompt, use the `-y` flag. Use this flag in scripts and CI jobs:
 
 ```bash
 local-26ai.sh test-script-install ./path/to/sql_script.sql -y

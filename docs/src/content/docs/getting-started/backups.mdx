@@ -9,17 +9,17 @@ import { Aside } from "@astrojs/starlight/components";
 
 ### Backup All Users
 
-Create datapump dumps of all users, including APEX workspaces and applications:
+Create datapump dumps of all users, with their APEX workspaces and applications:
 
 ```bash
 local-26ai.sh backup-all
 ```
 
-Files are written to the `./backups/export` directory.
+The script writes the files to the `./backups/export` directory.
 
 ### Backup Specific Schema
 
-Backup a single schema with its workspace and applications:
+Back up a single schema with its workspace and applications:
 
 ```bash
 local-26ai.sh backup-user movies
@@ -34,6 +34,7 @@ local-26ai.sh import-backup movies
 ```
 
 <Aside type="note" title="Future Enhancements">
-  Currently this creates the user if it doesn't exist and imports the datapump
-  dump. I plan to enhance this to also import APEX workspaces and applications.
+  This command imports the datapump dump. If the user does not exist, the
+  command creates it first. I plan to also import APEX workspaces and
+  applications later.
 </Aside>

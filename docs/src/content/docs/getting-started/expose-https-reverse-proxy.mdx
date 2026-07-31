@@ -7,42 +7,49 @@ sidebar:
 
 import { Aside, Steps } from "@astrojs/starlight/components";
 
-By default ORDS is only reachable over plain HTTP on a high port (e.g. `http://your-server:8181/ords/`). If you want to reach your environment over a real domain with a valid TLS certificate (like for a small hosted instance) the simplest approach is to run **nginx** on the host as a reverse proxy that terminates TLS and forwards requests to the ORDS container. Certificates come free from **Let's Encrypt** and renew automatically via `certbot`.
+By default ORDS uses plain HTTP on a high port, for example `http://your-server:8181/ords/`.
+
+To reach your environment over a real domain with a valid TLS certificate, run **nginx** on the host. nginx works as a reverse proxy. It terminates TLS and sends the requests to the ORDS container. **Let's Encrypt** gives you the certificates at no cost, and `certbot` renews them automatically.
 
 <Aside type="caution" title="Not a hardening guide">
-  This exposes your environment to the public internet. Run the installer's
-  secure mode ([`./install.sh
-  --secure`](/products/uc-local-apex-dev/docs/getting-started/)), which disables
-  the ORDS surfaces reachable without app authentication (Database REST API,
-  MongoDB API, SQL Developer Web / Database Actions, debug-to-screen) and uses
-  per-workspace passwords instead of the shared `Welcome_1`. <br /> For existing
-  workspaces make sure the APEX admin/workspace passwords are strong, remove
-  sample content you don't want public, and keep the database port (`1521`)
-  closed to the outside.
+  Run the installer in secure mode
+  ([`./install.sh --secure`](/products/uc-local-apex-dev/docs/getting-started/))
+  before you do these steps. This setup makes your environment reachable from the
+  public internet.
+
+Secure mode disables the ORDS surfaces that work without an application login
+(Database REST API, MongoDB API, SQL Developer Web / Database Actions,
+debug-to-screen). It also uses one password per workspace instead of the shared
+`Welcome_1`.
+
+For existing workspaces, use strong passwords for the APEX admin user and the
+workspace users. Delete the sample content that must stay private. Keep the
+database port (`1521`) closed to the outside.
+
 </Aside>
 
-## What you'll set up
+## What you install
 
 ```
 Browser ──HTTPS(443)──▶ nginx (host) ──HTTP(8181)──▶ ORDS container ──▶ APEX
          ◀─HTTP(80)──▶ redirect to HTTPS
 ```
 
-- nginx listens on `80` and `443` on the host.
-- Port `80` serves the ACME challenge (for issuing/renewing certs) and redirects everything else to HTTPS.
+- nginx listens on port `80` and port `443` on the host.
+- Port `80` serves the ACME challenge for new and renewed certificates. It redirects all other requests to HTTPS.
 - Port `443` terminates TLS and proxies `/ords/` and `/i/` to the ORDS HTTP connector on `127.0.0.1:8181`.
 
 ## Prerequisites
 
-- A server running your `uc-local-apex-dev` stack, with the ORDS HTTP port published on the host (`8181` by default — check with `docker ps` / `podman ps`).
+- A server that runs your `uc-local-apex-dev` stack. The ORDS HTTP port must be published on the host (`8181` by default). Show it with `docker ps` or `podman ps`.
 - **root / sudo** access on the host.
-- A **domain name** with a DNS `A` record (and `AAAA` if you use IPv6) pointing to the server's public IP. Confirm it resolves before you start:
+- A **domain name** with a DNS `A` record that points to the public IP address of the server. Add an `AAAA` record for IPv6. Make sure that the name resolves before you start:
 
   ```bash
   getent hosts your-domain.example.com
   ```
 
-- Ports **80 and 443 reachable from the internet**. If a firewall is active, open them (skip if no firewall is running):
+- Ports **80 and 443 open to the internet**. If a firewall runs on the host, open the ports:
 
   ```bash
   # firewalld (RHEL/Rocky/Alma)
@@ -52,10 +59,10 @@ Browser ──HTTPS(443)──▶ nginx (host) ──HTTP(8181)──▶ ORDS co
   ```
 
 <Aside type="note" title="This guide uses Rocky Linux 10">
-  Commands below use `dnf`. On Debian/Ubuntu install with `apt install nginx
-  certbot`, and the nginx config lives in `/etc/nginx/sites-available/` + a
-  symlink in `sites-enabled/` instead of `/etc/nginx/conf.d/`. Everything else
-  is identical.
+  The commands on this page use `dnf`. On Debian and Ubuntu, install the packages
+  with `apt install nginx certbot`. On those systems the nginx configuration is in
+  `/etc/nginx/sites-available/`, with a symbolic link in `sites-enabled/`, not in
+  `/etc/nginx/conf.d/`. Everything else is the same.
 </Aside>
 
 ## Steps
@@ -71,13 +78,13 @@ Browser ──HTTPS(443)──▶ nginx (host) ──HTTP(8181)──▶ ORDS co
 
 2. **Create the ACME webroot and a bootstrap config**
 
-   nginx must be running so certbot can prove domain ownership over port 80. Start with a minimal config that only serves the challenge:
+   nginx must run, because certbot proves the ownership of the domain over port 80. Start with a small configuration that serves the challenge only:
 
    ```bash
    mkdir -p /var/www/certbot
    ```
 
-   Create `/etc/nginx/conf.d/apex.conf` (replace `your-domain.example.com` throughout):
+   Create `/etc/nginx/conf.d/apex.conf`. Replace `your-domain.example.com` in every line:
 
    ```nginx
    server {
@@ -107,11 +114,11 @@ Browser ──HTTPS(443)──▶ nginx (host) ──HTTP(8181)──▶ ORDS co
      -m you@example.com
    ```
 
-   On success the cert lives at `/etc/letsencrypt/live/your-domain.example.com/`.
+   After success the certificate is in `/etc/letsencrypt/live/your-domain.example.com/`.
 
 4. **Write the full reverse-proxy config**
 
-   Replace the contents of `/etc/nginx/conf.d/apex.conf` with the two server blocks below (adjust the domain and, if your ORDS HTTP port isn't `8181`, the `proxy_pass` port):
+   Replace the content of `/etc/nginx/conf.d/apex.conf` with these two server blocks. Change the domain. If your ORDS HTTP port is not `8181`, also change the `proxy_pass` port:
 
    ```nginx
    # HTTP: ACME challenge + redirect everything else to HTTPS
@@ -192,7 +199,7 @@ Browser ──HTTPS(443)──▶ nginx (host) ──HTTP(8181)──▶ ORDS co
 
 5. **Make renewals reload nginx automatically**
 
-   certbot renews certs on a schedule, but nginx keeps serving the old cert until it reloads. Add a deploy hook so every successful renewal reloads nginx:
+   certbot renews the certificates on a schedule. nginx serves the old certificate until it reloads. Add a deploy hook, so nginx reloads after every renewal:
 
    ```bash
    mkdir -p /etc/letsencrypt/renewal-hooks/deploy
@@ -205,7 +212,7 @@ Browser ──HTTPS(443)──▶ nginx (host) ──HTTP(8181)──▶ ORDS co
 
 6. **Enable and verify auto-renewal**
 
-   The certbot package ships a systemd timer. Make sure it's active and test the renewal end to end (uses the staging server, changes nothing):
+   The certbot package includes a systemd timer. Make sure that the timer is active. Then do a test renewal. The test uses the staging server and changes nothing:
 
    ```bash
    systemctl enable --now certbot-renew.timer
@@ -228,28 +235,29 @@ curl -sI https://your-domain.example.com/ords/
 curl -so /dev/null -w "%{http_code}\n" https://your-domain.example.com/i/apex_ui/css/Core.min.css
 ```
 
-Then open `https://your-domain.example.com/ords/` in a browser — you should land on the APEX sign-in with a valid padlock.
+Then open `https://your-domain.example.com/ords/` in a browser. The APEX sign-in page opens, and the browser shows a valid padlock.
 
 ## Troubleshooting
 
 <Aside type="tip" title="ORDS redirects to http:// instead of https://">
-  ORDS terminates TLS itself, so it builds its absolute redirect URLs (e.g.
-  `/ords/_/landing`) from the incoming `Host` header while assuming the
-  connector's own `http://` scheme — it ignores `X-Forwarded-Proto`. Without a
-  fix the browser bounces `https → http → https` on every redirect. The
-  `proxy_redirect` line in the config above rewrites those `Location` headers
-  back to `https://`, removing the extra hop. Note the **regex form**
-  (`~^http://...`) is required — the plain prefix form with a `$host` variable
-  does not match reliably.
+  ORDS builds its absolute redirect URLs (for example `/ords/_/landing`) from the
+  incoming `Host` header. It uses the `http://` scheme of its own connector and
+  ignores `X-Forwarded-Proto`. Without a correction the browser goes
+  `https → http → https` at every redirect.
+
+The `proxy_redirect` line in the configuration above changes those `Location`
+headers back to `https://` and removes the extra request. You must use the
+**regex form** (`~^http://...`). The plain prefix form with a `$host` variable
+does not match reliably.
 </Aside>
 
-- **`nginx -t` fails on `options-ssl-nginx.conf`** — that helper file only exists if you use certbot's _nginx installer_ plugin. This guide issues certs with `certonly`, so the TLS settings are written inline instead (as shown). Don't `include` that file.
-- **certbot can't reach the domain** — confirm DNS points at the server (`getent hosts your-domain.example.com`) and that ports 80/443 are open in both the OS firewall and any cloud provider security group.
-- **502 Bad Gateway** — ORDS isn't reachable at the `proxy_pass` target. Check the container is up (`docker ps` / `podman ps`) and that the port matches (`curl -sI http://127.0.0.1:8181/ords/` on the host).
-- **Redirect loop when testing with `curl`** — APEX appends a `?session=` id on the first hit and expects a cookie back. Use a cookie jar (`curl -c cj.txt -b cj.txt -L ...`); a normal browser handles this automatically.
+- **`nginx -t` fails on `options-ssl-nginx.conf`** — this helper file exists only with the _nginx installer_ plugin of certbot. This guide creates the certificates with `certonly`, so the configuration above contains the TLS directives directly. Do not `include` that file.
+- **certbot cannot reach the domain** — make sure that DNS points to the server (`getent hosts your-domain.example.com`). Make sure that ports 80 and 443 are open in the firewall of the operating system. Open them in the security group of your cloud provider too.
+- **502 Bad Gateway** — nginx cannot reach ORDS at the `proxy_pass` target. Make sure that the container runs (`docker ps` or `podman ps`). Make sure that the port is correct (`curl -sI http://127.0.0.1:8181/ords/` on the host).
+- **Redirect loop with `curl`** — APEX adds a `?session=` ID at the first request and expects a cookie in return. Use a cookie jar (`curl -c cj.txt -b cj.txt -L ...`). A browser does this automatically.
 
 <Aside type="note" title="Docker or Podman">
-  This runs on the host and doesn't care which container engine you use — it
-  only talks to the published ORDS port (`8181`). If your ORDS container
-  publishes a different host port, update the `proxy_pass` ports accordingly.
+  nginx runs on the host and connects to the published ORDS port (`8181`) only.
+  The container engine makes no difference. If your ORDS container publishes a
+  different host port, change the `proxy_pass` ports.
 </Aside>

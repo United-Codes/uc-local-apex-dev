@@ -15,28 +15,30 @@ Create a new database schema and APEX workspace in one command:
 local-26ai.sh create-user movies
 ```
 
-This will:
+The command does the following:
 
-- Create a new schema with the given name
-- Store the schema password in the `.env` file
-- Save the connection in SQLcl's connection store
-- Add all necessary development grants
-- Give access to datapump directories
-- Create an APEX workspace with convenient settings
-- Optimize workspace settings like session length, max emails and REST messages and password lifetime
+- Creates a schema with the name that you give
+- Stores the schema password in the `.env` file
+- Saves the connection in the connection store of SQLcl
+- Adds the development grants
+- Gives access to the datapump directories
+- Creates an APEX workspace
+- Sets the workspace settings for session length, maximum emails, REST messages, and password lifetime
 
 <Aside type="tip" title="Access Credentials">
-  You can access the workspace with: - **Username**: `ADMIN` or the schema name
-  (e.g., `MOVIES`) - **Password**: `Welcome_1` - **URL**:
-  http://localhost:8181/ords/apex
+  Log in to the workspace with these values:
+
+  - **Username**: `ADMIN` or the schema name, for example `MOVIES`
+  - **Password**: `Welcome_1`
+  - **URL**: http://localhost:8181/ords/apex
 </Aside>
 
 <Aside type="note" title="Use a random password instead of Welcome_1">
-  By default new workspaces use the shared dev password `Welcome_1`. Set
-  `WORKSPACE_USE_INTERNAL_PASSWORD=true` in your `.env` file to instead reuse the
-  (randomly generated) INTERNAL ADMIN password — i.e. the `ORACLE_PASSWORD` value
-  from `.env`, the same password the APEX Internal workspace `ADMIN` uses. New
-  workspaces created after that will use it for both the `ADMIN` and schema users.
+  By default, new workspaces use the shared development password `Welcome_1`. To
+  use the random `ORACLE_PASSWORD` value from `.env` instead, set
+  `WORKSPACE_USE_INTERNAL_PASSWORD=true` in that file. This is the same password
+  as the `ADMIN` user of the APEX Internal workspace. Every workspace that you
+  create after this change uses it for both the `ADMIN` user and the schema user.
 </Aside>
 
 ### Create Schema Only
@@ -49,7 +51,9 @@ local-26ai.sh create-user myschema --skip-workspace
 
 ### Create a Compressed Schema
 
-Add `--compress` to enable [Advanced Compression](https://www.oracle.com/database/advanced-compression/) (included in Oracle Database Free) on the new schema's tablespace from the start. Every table and index created afterwards is stored compressed automatically — advanced row compression for tables, advanced index compression for B-tree indexes — keeping the schema's disk footprint smaller as it grows.
+Add `--compress` to enable [Advanced Compression](https://www.oracle.com/database/advanced-compression/) on the tablespace of the new schema. Oracle Database Free includes this feature.
+
+The database then compresses every table and index that you create later. Tables get advanced row compression. B-tree indexes get advanced index compression. The schema uses less disk space as it grows.
 
 ```bash
 local-26ai.sh create-user movies --compress
@@ -58,53 +62,54 @@ local-26ai.sh create-user myschema --skip-workspace --compress
 ```
 
 <Aside type="tip" title="Already have data?">
-  `--compress` only sets the defaults for *new* segments, so it's meant for a fresh schema. To compress a schema that already contains data, use [`compress-space`](/products/uc-local-apex-dev/docs/getting-started/common-tasks/#compress-a-schemas-tablespace) instead.
+  `--compress` sets the defaults for *new* segments only. Use it on a fresh schema. If the schema already contains data, use [`compress-space`](/products/uc-local-apex-dev/docs/getting-started/common-tasks/#compress-a-schemas-tablespace) instead.
 </Aside>
 
 ### Clear a Schema
 
-Useful for testing installation scripts multiple times:
+Drop all objects in a schema and keep the schema itself. Use this command when you test an install script many times:
 
 ```bash
 local-26ai.sh clear-schema movies
 # Asks for confirmation before proceeding
 ```
 
-To skip the confirmation prompt (useful for automation), use the `-y` flag:
+To skip the confirmation prompt, use the `-y` flag. Use this flag in scripts and CI jobs:
 
 ```bash
 local-26ai.sh clear-schema movies -y
 ```
 
 <Aside type="caution" title="Data Loss Warning">
-  This drops ALL objects in the schema. Never run this accidentally on important
-  schemas! Or better: run backups regularly.
+  Do not run this command on a schema with important data. The command drops all
+  objects in the schema. Run backups regularly.
 </Aside>
 
 ### Drop a Schema
 
-Completely remove a schema and all its objects. This also drops the schema's dedicated tablespace and its datafile, so the disk space is reclaimed instead of being left behind as an orphan:
+Drop a schema and all its objects. The command also drops the tablespace of the schema and its datafile. The database returns the disk space to the operating system, so no orphan file stays behind:
 
 ```bash
 local-26ai.sh drop-user movies
 # Asks for confirmation before proceeding
 ```
 
-To skip the confirmation prompt (useful for automation), use the `-y` flag:
+To skip the confirmation prompt, use the `-y` flag. Use this flag in scripts and CI jobs:
 
 ```bash
 local-26ai.sh drop-user movies -y
 ```
 
 <Aside type="caution" title="Data Loss Warning">
-  This permanently removes the schema, all its objects, and its datafile. Make sure you have backups of anything you need.
+  Do not run this command without a backup. The command drops the schema, all its
+  objects, and its datafile permanently.
 </Aside>
 
 ## Database Access
 
 ### SQLcl and SQL Developer Access
 
-All created users are automatically stored in SQLcl's connection store:
+`create-user` stores every new user in the connection store of SQLcl:
 
 ```bash
 # Connect using the stored connection
@@ -114,7 +119,7 @@ sql -name local-26ai-movies
 sql -name local-26ai-sys
 ```
 
-You will also find the connections in the VS Code SQL Developer extension. You might need to refresh the connections list after creating a new user.
+The connections also appear in the VS Code SQL Developer extension. After you create a user, refresh the connection list.
 
 ### Other Development Tools
 

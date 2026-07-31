@@ -7,10 +7,10 @@ sidebar:
 
 import { Aside } from "@astrojs/starlight/components";
 
-Once your environment is set up, these are the most common tasks you'll perform during APEX development.
+After you install the environment, these are the most common tasks in APEX development.
 
 <Aside type="note" title="Docker or Podman">
-The commands below that call `docker compose` work with Podman too — just substitute `podman compose`. The project's own scripts (`local-26ai.sh`, `./scripts/*.sh`) auto-detect the engine, so you don't need to change anything when running those.
+The commands on this page that call `docker compose` also work with Podman. Replace `docker compose` with `podman compose`. The scripts of this project (`local-26ai.sh`, `./scripts/*.sh`) detect the engine, so you change nothing for those.
 </Aside>
 
 ## Managing Containers
@@ -32,7 +32,7 @@ local-26ai.sh start
 
 ### Modify ORDS Settings
 
-The `ords-config` folder in the root directory contains ORDS configuration files. Modify these files and restart the ORDS container to apply changes:
+The `ords-config` folder in the root directory contains the configuration files of ORDS. Change these files. Then restart the ORDS container:
 
 ```bash
 # After modifying config files
@@ -41,20 +41,20 @@ docker compose restart ords-26ai   # or: podman compose restart ords-26ai
 
 ### SSL Configuration
 
-Enable HTTPS for ORDS by creating self-signed certificates. On MacOS and Linux it will also add the certificate to your system's keychain:
+To enable HTTPS for ORDS, create self-signed certificates. On macOS and Linux the script also adds the certificate to the keychain of your system:
 
 ```bash
 sudo ./scripts/create-self-signed-certificates.sh
 docker compose restart ords-26ai   # or: podman compose restart ords-26ai
 ```
 
-Access via: https://localhost:8443/ords (Port 8443 instead of 8181).
+Then open https://localhost:8443/ords. ORDS uses port 8443 for HTTPS, not port 8181.
 
 ## Maintenance Tasks
 
 ### Check Database Space Usage
 
-Keep in mind that the FREE database has a space limitation of 12GB. You can check the used space with:
+The Free edition of the database has a space limit of 12GB. Show the used space with this command:
 
 ```bash
 local-26ai.sh used-space
@@ -76,7 +76,7 @@ local-26ai.sh used-space
 
 ### Shrink Database Files
 
-If your tablespaces have grown larger than the space they actually use, you can shrink them to reclaim space. This can take a while.
+If the tablespaces are larger than the space that they use, shrink them. This command can run for several minutes.
 
 ```bash
 local-26ai.sh shrink-space
@@ -84,13 +84,15 @@ local-26ai.sh shrink-space
 
 ### Compress a Schema's Tablespace
 
-While `shrink-space` only reclaims *unused* space, `compress-space` makes the data itself smaller. It enables [Advanced Compression](https://www.oracle.com/database/advanced-compression/) (included in Oracle Database Free) on a single schema's `tbs_<schema>` tablespace and rebuilds its existing objects so they're stored compressed:
+`shrink-space` reclaims *unused* space only. `compress-space` makes the data itself smaller.
 
-- Tables get advanced row compression (`COMPRESS FOR OLTP`), which keeps recompressing as rows change.
+The command enables [Advanced Compression](https://www.oracle.com/database/advanced-compression/) on the `tbs_<schema>` tablespace of one schema. Oracle Database Free includes this feature. The command then rebuilds the objects in that tablespace in compressed form:
+
+- Tables get advanced row compression (`COMPRESS FOR OLTP`). The database compresses them again when rows change.
 - B-tree indexes get advanced index compression (`COMPRESS ADVANCED LOW`).
-- New segments inherit the compression automatically, because the tablespace defaults are set too.
+- New segments also use compression, because the command sets the tablespace defaults.
 
-After rebuilding, it runs `dbms_space.shrink_tablespace` and resizes the datafile down, so the freed space is returned to the OS in the same run.
+After the rebuild, the command runs `dbms_space.shrink_tablespace` and makes the datafile smaller. The operating system gets the free space in the same run.
 
 ```bash
 local-26ai.sh compress-space movies
@@ -109,12 +111,12 @@ local-26ai.sh compress-space movies -y
 ```
 
 <Aside type="note">
-The operation is online and non-destructive (objects are rebuilt, never dropped) and safe to re-run — already-compressed objects are skipped. Single-column unique/primary-key indexes are intentionally left uncompressed: advanced index compression can't dedup them, so there's nothing to gain.
+The command runs online and never drops an object. You can run it again safely, because it skips the objects that are already compressed. It does not compress a unique index or a primary-key index with one column. Advanced index compression cannot remove duplicate values from these indexes.
 </Aside>
 
 ### Disable Archive Logs
 
-For development environments, you might want to disable archive logging. You will be asked if you want to do this in the `after-first-db-start.sh` script, but you can also run it manually:
+Archive logging is not necessary in a development environment. The `after-first-db-start.sh` script asks you about this setting. You can also run the script for it directly:
 
 ```bash
 ./scripts/disable-archive-logs.sh
@@ -124,54 +126,56 @@ For development environments, you might want to disable archive logging. You wil
 
 #### Unexpire Accounts
 
-If APEX_PUBLIC_USER or workspace accounts are locked due to password expiration, unlock them with:
+If the APEX_PUBLIC_USER account or a workspace account is locked because the password expired, unlock it with this command:
 
 ```bash
 ./scripts/unexpire-accounts.sh
 ```
 
-This is useful after database migrations or when accounts have expired due to time constraints.
+Run this script after a database migration, or when an account expires after some time.
 
 #### Disable Password Expiration
 
-To prevent APEX workspace accounts from expiring in the future:
+Run this script so the passwords of APEX workspace accounts never expire:
 
 ```bash
 ./scripts/disable-password-expiration.sh
 ```
 
 <Aside type="note">
-  Even with password expiration disabled, users may still be prompted to change
-  their password on their first login after a migration.
+  Users can still get a prompt to change the password at the first login after a
+  migration. This happens even when password expiration is disabled.
 </Aside>
 
 ## Workspace Import/Export
 
 ### Import All Exports
 
-Automatically import all export files from the `./backups/import/` directory:
+Import every export file from the `./backups/import/` directory:
 
 ```bash
 ./scripts/import-all.sh
 ```
 
-This is particularly useful during database migrations when you need to bulk import multiple workspaces and schemas. The script will provide a summary of successful and failed imports.
+Use this script during a database migration, when you import many workspaces and schemas at the same time. The script shows a summary of the successful and the failed imports.
 
 ### Fix Workspace Export Issues
 
-When re-importing APEX workspaces, you may encounter issues due to a [known bug with group assignments](https://forums.oracle.com/ords/apexds/post/apex-18-2-failing-to-import-workspace-5048). Fix this automatically:
+A [known bug with group assignments](https://forums.oracle.com/ords/apexds/post/apex-18-2-failing-to-import-workspace-5048) can make the import of an APEX workspace fail. If this happens, run this script:
 
 ```bash
 ./scripts/fix-ws-group-ids.sh
 ```
 
-This script updates all export files in `./backups/import/` to remove problematic group ID parameters, allowing successful re-import.
+The script deletes the group ID parameters from every export file in `./backups/import/`. Then the files import correctly.
 
 ## Complete Environment Reset
 
 ### Delete All Data
 
-To start completely fresh (⚠️ **ALL DATA WILL BE LOST**):
+⚠️ **CAUTION: These commands delete the database volume.** All schemas, workspaces, and applications are lost. Run `local-26ai.sh backup-all` first.
+
+To start again with an empty database, run these commands:
 
 ```bash
 docker compose down        # or: podman compose down
@@ -179,4 +183,4 @@ docker volume rm oradata-26ai   # or: podman volume rm oradata-26ai
 rm .env
 ```
 
-Then follow the [setup instructions](/products/uc-local-apex-dev/docs/getting-started/) again.
+Then do the [setup](/products/uc-local-apex-dev/docs/getting-started/) again.
