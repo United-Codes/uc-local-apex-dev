@@ -5,10 +5,29 @@ set -e
 
 source ./scripts/util/load_env.sh
 
-chmod -R 777 ./backups/import
-$CONTAINER_CLI cp ./backups/import ${CONTAINER_NAME}:/opt/oracle/oradata/datapump/
-#$CONTAINER_CLI exec -u oracle -it ${CONTAINER_NAME} bash -c 'chown -R $(id -u):$(id -g) /opt/oracle/oradata/datapump/import'
+# Both directions copy the WHOLE tree, so a caller that only produced one new
+# dump file must not pay for the other direction. backup-user.sh pulls, and
+# import-backup.sh pushes. With no argument both directions run, which is what
+# the `sync-backups-folder` command does.
+DIRECTION="${1:-both}"
 
-$CONTAINER_CLI cp ${CONTAINER_NAME}:/opt/oracle/oradata/datapump/export/ ./backups/
+case "$DIRECTION" in
+push | pull | both) ;;
+*)
+  echo "Usage: $0 [push|pull|both]"
+  exit 1
+  ;;
+esac
 
-echo "synced backups folder"
+if [ "$DIRECTION" = "push" ] || [ "$DIRECTION" = "both" ]; then
+  mkdir -p ./backups/import
+  chmod -R 777 ./backups/import
+  $CONTAINER_CLI cp ./backups/import "${CONTAINER_NAME}":/opt/oracle/oradata/datapump/
+  echo "pushed ./backups/import into ${CONTAINER_NAME}"
+fi
+
+if [ "$DIRECTION" = "pull" ] || [ "$DIRECTION" = "both" ]; then
+  mkdir -p ./backups
+  $CONTAINER_CLI cp "${CONTAINER_NAME}":/opt/oracle/oradata/datapump/export/ ./backups/
+  echo "pulled exports from ${CONTAINER_NAME} into ./backups/export"
+fi

@@ -9,13 +9,18 @@ import { Aside } from "@astrojs/starlight/components";
 
 ### Backup All Users
 
-Create datapump dumps of all users, with their APEX workspaces and applications:
+Create DataPump dumps of all users, with their APEX workspaces and applications:
 
 ```bash
 local-26ai.sh backup-all
 ```
 
 The script writes the files to the `./backups/export` directory.
+
+The command backs up every schema that has a `<NAME>_USER_PASSWORD` entry in
+`.env`. If a schema has no APEX workspace, the command skips the APEX part and
+continues. If a schema fails, the command shows a summary at the end and returns
+a non-zero exit code.
 
 ### Backup Specific Schema
 
@@ -25,16 +30,42 @@ Back up a single schema with its workspace and applications:
 local-26ai.sh backup-user movies
 ```
 
+Each run writes three things:
+
+- `./backups/export/movies.dmp` is the DataPump dump of the schema.
+- `./backups/export/apex/movies/` holds the workspace export and one file per
+  application.
+- `./backups/export/ords/movies/rest_schema.sql` holds the ORDS REST
+  definitions.
+
+The command keeps the dump of the previous run as `movies_bkp.dmp`. It rotates
+that file only after the new export succeeds.
+
 ### Import Backup
 
-Restore a previously created backup:
+Copy the files of a backup into `./backups/import`. Then restore the schema:
 
 ```bash
 local-26ai.sh import-backup movies
 ```
 
-<Aside type="note" title="Future Enhancements">
-  This command imports the datapump dump. If the user does not exist, the
-  command creates it first. I plan to also import APEX workspaces and
-  applications later.
+The command imports the DataPump dump, the APEX workspace, the applications and
+the ORDS definitions. If the schema does not exist, the command creates it
+first.
+
+<Aside type="caution" title="Restore on a different instance">
+  The workspace IDs and group IDs of one instance do not match another instance.
+  If you restore a backup that another instance created, run `local-26ai.sh
+  fix-ws-group-ids` before the import.
 </Aside>
+
+### Import All Users
+
+Restore every export file in the `./backups/import` directory:
+
+```bash
+local-26ai.sh import-all
+```
+
+The command reads the `<NAME>_USER_PASSWORD` entries in `.env` and asks for
+confirmation. It then restores one schema after the other.
