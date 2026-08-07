@@ -49,6 +49,19 @@ cp -R ./apex/images/. ./apex-images/
 
 echo "Configuring INTERNAL workspace settings"
 
+# Session-timeout defaults depend on the hardening flag. A local-only dev DB
+# gets very long sessions for convenience; a hardened install (SECURE_MODE=true,
+# set by `install.sh --secure`, meant for a hosted test DB) gets bounded ones.
+if [ "${SECURE_MODE:-false}" = "true" ]; then
+  # Secure: 18h max length, 8h max idle.
+  MAX_SESSION_LENGTH_SEC=64800
+  MAX_SESSION_IDLE_SEC=28800
+else
+  # Dev convenience: 7 days for both.
+  MAX_SESSION_LENGTH_SEC=604800
+  MAX_SESSION_IDLE_SEC=604800
+fi
+
 # get workspace settings (extended session timeout, etc)
 WS_SETTINGS=$(get_ws_settings "INTERNAL")
 
@@ -67,12 +80,18 @@ sql -name "$DB_CONN_NAME" <<SQL
 
     -- Instance-level APEX settings via the supported public API instead of
     -- poking wwv_flow_platform_prefs directly.
-    apex_instance_admin.set_parameter('MAX_SESSION_IDLE_SEC', 604800);
-    apex_instance_admin.set_parameter('MAX_SESSION_LENGTH_SEC', 604800);
+    apex_instance_admin.set_parameter('MAX_SESSION_IDLE_SEC', $MAX_SESSION_IDLE_SEC);
+    apex_instance_admin.set_parameter('MAX_SESSION_LENGTH_SEC', $MAX_SESSION_LENGTH_SEC);
     -- 9999 is the max ACCOUNT_LIFETIME_DAYS the API allows (validated against
     -- [1-9][0-9]{0,3}); ~27 years, i.e. effectively never for a dev env.
     apex_instance_admin.set_parameter('ACCOUNT_LIFETIME_DAYS', 9999);
     apex_instance_admin.set_parameter('MAX_APPLICATION_BACKUPS', 3);
+    -- Instance-wide default for a true runtime-cascade parameter: a workspace
+    -- with no explicit override resolves this to the instance value at runtime,
+    -- so we no longer set it per-workspace in scripts/util/get_ws_settings.sh.
+    -- (ALLOW_HOSTING_EXTENSIONS is NOT such a parameter -- it is a NOT NULL
+    -- per-workspace column, so it stays in get_ws_settings.sh.)
+    apex_instance_admin.set_parameter('MAX_WEBSERVICE_REQUESTS', 100000);
 
     -- Relax the APEX site-admin password rule so the auto-generated
     -- alphanumeric ORACLE_PASSWORD (used as the INTERNAL ADMIN password by
