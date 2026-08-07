@@ -51,6 +51,23 @@ done
 USERNAME_UPPER=$(echo "$USERNAME" | tr '[:lower:]' '[:upper:]')
 USERNAME_LOWER=$(echo "$USERNAME" | tr '[:upper:]' '[:lower:]')
 
+# Decide the APEX workspace login password. By default new workspaces use the
+# well-known shared dev password 'Welcome_1'. Set WORKSPACE_USE_INTERNAL_PASSWORD=true
+# in .env to instead reuse the (randomly generated) INTERNAL ADMIN password, i.e.
+# ORACLE_PASSWORD, which is what the APEX Internal workspace ADMIN also uses.
+# A secure install (SECURE_MODE=true, set by `install.sh --secure`) implies this.
+if [ "${WORKSPACE_USE_INTERNAL_PASSWORD:-false}" = "true" ] || [ "${SECURE_MODE:-false}" = "true" ]; then
+  if [ -z "${ORACLE_PASSWORD:-}" ]; then
+    echo "Error: WORKSPACE_USE_INTERNAL_PASSWORD=true but ORACLE_PASSWORD is not set in .env"
+    exit 1
+  fi
+  WS_PASSWORD=$ORACLE_PASSWORD
+  WS_PASSWORD_LABEL="the INTERNAL ADMIN password (ORACLE_PASSWORD from .env)"
+else
+  WS_PASSWORD="Welcome_1"
+  WS_PASSWORD_LABEL="Welcome_1"
+fi
+
 # When --compress is given, set Advanced Compression defaults on the new
 # tablespace so every segment created in it is born compressed (advanced row
 # compression for tables, advanced index compression for B-tree indexes). The
@@ -126,6 +143,7 @@ ${COMPRESS_DEFAULTS}
   grant create any context to ${USERNAME};
   grant create mle to ${USERNAME};
   grant create property graph to ${USERNAME};
+  grant create assertion to ${USERNAME};
   grant execute dynamic mle to ${USERNAME};
 
   grant execute on dbms_crypto to ${USERNAME};
@@ -190,7 +208,7 @@ else
 
       APEX_UTIL.CREATE_USER(
         p_user_name                    => '${USERNAME}',
-        p_web_password                 => 'Welcome_1',
+        p_web_password                 => '${WS_PASSWORD}',
         p_email_address                => '${USERNAME}@localhost.com',
         p_developer_privs              => 'ADMIN:CREATE:DATA_LOADER:EDIT:HELP:MONITOR:SQL',
         p_change_password_on_first_use => 'N',
@@ -201,7 +219,7 @@ else
 
       APEX_UTIL.CREATE_USER(
         p_user_name                    => 'ADMIN',
-        p_web_password                 => 'Welcome_1',
+        p_web_password                 => '${WS_PASSWORD}',
         p_email_address                => 'admin@localhost.com',
         p_developer_privs              => 'ADMIN:CREATE:DATA_LOADER:EDIT:HELP:MONITOR:SQL',
         p_change_password_on_first_use => 'N',
@@ -227,7 +245,7 @@ else
 SQL
 
   echo ">>>>"
-  echo "created workspace. Access with username 'ADMIN' or ${USERNAME} and password 'Welcome_1'"
+  echo "created workspace. Access with username 'ADMIN' or ${USERNAME} and password ${WS_PASSWORD_LABEL}"
   echo "http://localhost:8181/ords/r/apex/workspace-sign-in/oracle-apex-sign-in"
 fi
 

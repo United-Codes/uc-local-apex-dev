@@ -8,6 +8,12 @@ on:
       - master
       - "25-*"
       - "26-*"
+  pull_request:
+    branches:
+      - main
+      - master
+      - "25-*"
+      - "26-*"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -105,16 +111,19 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Install sqlv and SQLcl 26.1.2
+      # Oracle's "latest" SQLcl zip, extracted straight to $HOME/sqlcl. We used
+      # to pin a version through sqlv, but its index only carries the two
+      # releases Oracle currently advertises, so a pin breaks as soon as Oracle
+      # rotates them.
+      - name: Install SQLcl (latest)
         run: |
           set -euo pipefail
-          curl -fsSL https://raw.githubusercontent.com/United-Codes/sqlv/main/install.sh | bash
-          export PATH="$HOME/sqlv/bin:$HOME/sqlv/current/bin:$PATH"
-          sqlv install 26.1.2
+          curl -fsSL -o "$RUNNER_TEMP/sqlcl.zip" \
+            https://download.oracle.com/otn_software/java/sqldeveloper/sqlcl-latest.zip
+          unzip -q "$RUNNER_TEMP/sqlcl.zip" -d "$HOME"
           # Persist PATH for later steps
-          echo "$HOME/sqlv/bin" >> "$GITHUB_PATH"
-          echo "$HOME/sqlv/current/bin" >> "$GITHUB_PATH"
-          sql -V
+          echo "$HOME/sqlcl/bin" >> "$GITHUB_PATH"
+          "$HOME/sqlcl/bin/sql" -V
 
       # install.sh is the one-shot installer end users run: it generates
       # .env via setup.sh, pulls images, brings the stack up, waits for the
@@ -149,9 +158,28 @@ jobs:
           select 'apex_version: ' || version_no from apex_release;
           select 'workspace_count: ' || count(*) from apex_workspaces;
           select 'apex_internal_admin=' || count(*) from apex_workspace_apex_users where user_name = 'ADMIN' and workspace_name = 'INTERNAL';
+          -- Instance parameters applied by upgrade-apex.sh (via
+          -- apex_instance_admin.set_parameter). Read them back through the
+          -- supported API and assert below. upgrade-apex.sh's SQL heredoc has no
+          -- `whenever sqlerror exit failure`, so a mistyped parameter name there
+          -- would otherwise pass CI green — these asserts are the real guard.
+          -- STRONG_SITE_ADMIN_PASSWORD is deliberately NOT asserted here: it is
+          -- only relaxed transiently so apxchpwd accepts the alphanumeric
+          -- password, and gets reset to the 'Y' default afterwards. Its effect
+          -- is covered instead by the apex_internal_admin=1 check above — if the
+          -- relaxation had failed, apxchpwd would reject the password and ADMIN
+          -- would be missing.
+          select 'p_idle='    || apex_instance_admin.get_parameter('MAX_SESSION_IDLE_SEC')    from dual;
+          select 'p_length='  || apex_instance_admin.get_parameter('MAX_SESSION_LENGTH_SEC')  from dual;
+          select 'p_account=' || apex_instance_admin.get_parameter('ACCOUNT_LIFETIME_DAYS')   from dual;
+          select 'p_backups=' || apex_instance_admin.get_parameter('MAX_APPLICATION_BACKUPS') from dual;
           exit
           SQL
           grep -qx 'apex_internal_admin=1' smoke.out
+          grep -qx 'p_idle=604800'  smoke.out
+          grep -qx 'p_length=604800' smoke.out
+          grep -qx 'p_account=9999'  smoke.out
+          grep -qx 'p_backups=3'     smoke.out
 
       # -----------------------------------------------------------------
       # Script tests — exercise the user-facing scripts against the real

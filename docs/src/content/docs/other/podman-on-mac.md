@@ -7,7 +7,7 @@ sidebar:
 
 ## Prerequisites
 
-You need the [homebrew](https://brew.sh/) package manager for this:
+You need the [homebrew](https://brew.sh/) package manager for these steps:
 
 ```sh
 brew install sqlcl
@@ -17,7 +17,7 @@ brew install sqlcl
 brew install docker docker-compose
 ```
 
-Upgrade tolerant way of adding SQLcl to your PATH (add it to your ~/.bashrc or ~/.zshrc):
+Add SQLcl to your `PATH` with these lines. They also work after an upgrade of SQLcl. Put them in your `~/.bashrc` or `~/.zshrc`:
 
 ```sh
 SQLCLPATH=$(ls -t $(brew --prefix)/Caskroom/sqlcl | head -1)
@@ -28,14 +28,14 @@ PATH=$(brew --prefix)/Caskroom/sqlcl/$SQLCLPATH/sqlcl/bin:$PATH
 
 ## Installing Podman
 
-If you have no Docker runtime yet, I recommend doing the following:
+If you have no Docker runtime yet, run these commands:
 
 ```sh
 brew install podman
 
 podman machine init
 
-# I recommend increasing the resources if you have enough
+# Increase the memory and the CPUs if the host has enough
 podman machine set --memory 4096
 podman machine set --cpus 3
 
@@ -51,31 +51,31 @@ podman machine start
 # Please do so
 ```
 
-Now test that podman works:
+Now make sure that podman works:
 
 ```sh
 podman ps
 ```
 
-The project's scripts (`install.sh`, `local-26ai.sh`, etc.) natively detect Podman — if `docker`
-isn't installed they automatically use `podman` and the native `podman compose` subcommand. You can
-run them as-is. If you have both Docker and Podman installed and want to force Podman, set
-`CONTAINER_CLI`:
+The scripts of this project (`install.sh`, `local-26ai.sh`, and the scripts in `./scripts`) detect
+Podman. If `docker` is not installed, they use `podman` and the native `podman compose` subcommand.
+You can run them without a change. If both Docker and Podman are installed, set `CONTAINER_CLI` to
+select Podman:
 
 ```sh
 CONTAINER_CLI=podman ./install.sh
 ```
 
-If you'd rather route the scripts' `docker` usage through Podman's Docker-compatible socket instead,
-you can still do that — test it with `docker ps`.
+You can also send the `docker` commands of the scripts to the Docker-compatible socket of Podman.
+Make sure that this works with `docker ps`.
 
 ## Troubleshooting
 
-If this does not work please [follow this guide](https://podman-desktop.io/docs/migrating-from-docker/using-the-docker_host-environment-variable).
+If this does not work, [read this guide](https://podman-desktop.io/docs/migrating-from-docker/using-the-docker_host-environment-variable).
 
-If you have this file `~/.docker/config.json`, delete or rename it if you see this error: `error getting credentials - err: exec: "docker-credential-desktop": executable file not found in $PATH`.
+If you see this error, delete or rename the `~/.docker/config.json` file: `error getting credentials - err: exec: "docker-credential-desktop": executable file not found in $PATH`.
 
-Alternatively, you can drive the stack directly with the native `podman compose` subcommand:
+You can also control the stack directly with the native `podman compose` subcommand:
 
 ```sh
 podman compose up -d
@@ -84,24 +84,24 @@ podman ps
 # etc
 ```
 
-Use `podman compose` (the subcommand), not the standalone `podman-compose` package — the latter
-can cause trouble and doesn't support everything in this project's `docker-compose.yml`.
+Use the `podman compose` subcommand, not the standalone `podman-compose` package. That package does
+not support everything in the `docker-compose.yml` file of this project.
 
 ## After a restart
 
-After a restart of your Mac, you need to start the Podman machine again:
+After a restart of your Mac, start the Podman machine again:
 
 ```sh
 podman machine start
 ```
 
-Equally you can stop it with:
+You can stop it with this command:
 
 ```sh
 podman machine stop
 ```
 
-But I recommend stopping the database before stopping the Podman machine:
+Stop the database before you stop the Podman machine:
 
 ```sh
 local-26ai.sh stop

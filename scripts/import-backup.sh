@@ -93,7 +93,8 @@ else
   fi
 fi
 
-./scripts/sync-backups-folder.sh
+# Only the push direction matters here: the dump has to reach the container.
+./scripts/sync-backups-folder.sh push
 
 echo "Importing $USERNAME_UPPER"
 

@@ -110,6 +110,8 @@ if [ ! -f ./apex/apxchpwd.sql ]; then
 fi
 echo -e "ADMIN\nADMIN\n$ADMIN_PWD" | sql -name "$DB_CONN_NAME" @apex/apxchpwd.sql
 
+./scripts/disable-password-expiration.sh
+
 ./scripts/sync-backups-folder.sh
 
 if [ -t 0 ]; then

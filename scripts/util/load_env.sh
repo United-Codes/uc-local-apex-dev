@@ -24,26 +24,45 @@ sql() {
 }
 export -f sql
 
-# Detect container engine (honor a pre-set CONTAINER_CLI, else prefer docker, fall back to podman)
+# Detect container engine + its Compose plugin together. ONLY the native
+# '<engine> compose' subcommand is supported -- the standalone 'docker-compose'
+# / 'podman-compose' tools are not.
+#
+# An engine is only usable if it ALSO provides a working 'compose' subcommand.
+# A host may have the docker CLI without the Compose plugin while podman ships a
+# working 'podman compose' (or vice versa) -- so we prefer docker, fall back to
+# podman, but pick the first candidate that has BOTH the CLI and compose.
+has_compose() { "$1" compose version &>/dev/null; }
+
 if [ -n "${CONTAINER_CLI:-}" ]; then
-  :
-elif command -v docker &>/dev/null; then
-  CONTAINER_CLI="docker"
-elif command -v podman &>/dev/null; then
-  CONTAINER_CLI="podman"
+  candidates=("$CONTAINER_CLI")
 else
+  candidates=()
+  command -v docker &>/dev/null && candidates+=("docker")
+  command -v podman &>/dev/null && candidates+=("podman")
+fi
+
+if [ ${#candidates[@]} -eq 0 ]; then
   echo "Error: neither 'docker' nor 'podman' found"
   exit 1
 fi
 
-# Detect its compose command. Use the native 'compose' subcommand; for docker keep the
-# legacy 'docker-compose' v1 fallback. Podman uses ONLY 'podman compose' (no podman-compose).
-if $CONTAINER_CLI compose version &>/dev/null 2>&1; then
-  DOCKER_COMPOSE="$CONTAINER_CLI compose"
-elif [ "$CONTAINER_CLI" = "docker" ] && command -v docker-compose &>/dev/null; then
-  DOCKER_COMPOSE="docker-compose"
-else
-  echo "Error: no compose command found for '$CONTAINER_CLI' (podman needs the native 'podman compose' subcommand)"
+DOCKER_COMPOSE=""
+for engine in "${candidates[@]}"; do
+  if has_compose "$engine"; then
+    CONTAINER_CLI="$engine"
+    DOCKER_COMPOSE="$engine compose"
+    break
+  fi
+done
+
+if [ -z "$DOCKER_COMPOSE" ]; then
+  # No candidate has a working Compose plugin -- report against the engine we
+  # would otherwise have chosen (the first candidate) and bail.
+  CONTAINER_CLI="${candidates[0]}"
+  # shellcheck source=scripts/util/compose-hint.sh
+  source "$(dirname "${BASH_SOURCE[0]}")/compose-hint.sh"
+  compose_install_hint "$CONTAINER_CLI"
   exit 1
 fi
 

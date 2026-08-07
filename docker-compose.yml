@@ -7,9 +7,10 @@ services:
       - ./.env
     volumes:
       - oradata-26ai:/opt/oracle/oradata
-    restart: no
+    restart: "${RESTART_POLICY:-no}"
     healthcheck:
-      #test: ["CMD", "healthcheck.sh"]
+      test:
+        ["CMD-SHELL", "/opt/oracle/checkDBStatus.sh >/dev/null 2>&1 || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -35,15 +36,19 @@ services:
         bind:
           selinux: z
           create_host_path: true
-    restart: no
+    restart: "${RESTART_POLICY:-no}"
     env_file:
       - ./.env
     environment:
-      - DEBUG=true
+      # ORDS maps DEBUG -> debug.printDebugToScreen on every boot. Interpolated
+      # from .env (DEBUG_TO_SCREEN) so `install.sh --secure` can persistently turn
+      # it off; defaults on for dev. NB: do not name the .env key ORDS_DEBUG --
+      # that is reserved inside the ORDS launcher (JVM -agentlib:jdwp options).
+      - DEBUG=${DEBUG_TO_SCREEN:-true}
     depends_on:
       26ai:
         condition: service_healthy
-    image: container-registry.oracle.com/database/ords:26.1.2
+    image: container-registry.oracle.com/database/ords:26.2.1
     container_name: local-26ai-ords
 
 networks:

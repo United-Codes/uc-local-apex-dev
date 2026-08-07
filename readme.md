@@ -4,6 +4,23 @@
 
 A containerized development environment (works with Docker, Podman, or any container runtime) that automates common tasks and lets you focus on building APEX applications.
 
+## Quick start
+
+```bash
+git clone https://github.com/United-Codes/uc-local-apex-dev.git
+cd uc-local-apex-dev
+./install.sh
+```
+
+The installer asks no questions and needs 20 to 40 minutes. Then open
+http://localhost:8181/ords/apex. Log in to the `INTERNAL` workspace with the user
+`ADMIN`. The password is the `ORACLE_PASSWORD` value from the generated `.env` file.
+
+You need Docker or Podman with the `compose` subcommand, SQLcl in your `PATH`,
+`unzip`, and `curl` or `wget`. The container needs 4GB RAM, 3 CPUs, and 35GB of disk
+space. For the prerequisites and the details, read the
+[Installation Guide](https://www.united-codes.com/products/uc-local-apex-dev/docs/getting-started/).
+
 ## Features
 
 Everything is a single command via the `local-26ai.sh` wrapper — run `local-26ai.sh --help` or see the [Command Reference](https://www.united-codes.com/products/uc-local-apex-dev/docs/reference/commands/) for the full list.
@@ -17,9 +34,7 @@ Everything is a single command via the `local-26ai.sh` wrapper — run `local-26
 - ✅ [Full PL/SQL debugging support](https://www.united-codes.com/products/uc-local-apex-dev/docs/getting-started/plsql-debugging/) with VS Code SQL Developer
 - ✅ Disk-space tooling for the 12GB Free edition: usage report, shrink, and Advanced Compression
 
-**⚠️ This is not for production use!** Intentionally unsecure and optimized for ease of development. Passwords stored in plain text, security features relaxed. For local development only.
-
-[Installation Guide](https://www.united-codes.com/products/uc-local-apex-dev/docs/getting-started/)
+**⚠️ This is not for production use!** Intentionally unsecure and optimized for ease of development. Passwords stored in plain text, security features relaxed. For local development only. To host it as a shared **test** database, read [Host as a Test Database](https://www.united-codes.com/products/uc-local-apex-dev/docs/getting-started/host-test-db/).
 
 ## Documentation
 

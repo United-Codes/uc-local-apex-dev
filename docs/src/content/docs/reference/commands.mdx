@@ -7,15 +7,15 @@ sidebar:
 
 import { Aside } from "@astrojs/starlight/components";
 
-Every feature of this project is available as a single command through the `local-26ai.sh` wrapper. This page lists all of them. Run `local-26ai.sh --help` to see the same overview in your terminal.
+The `local-26ai.sh` wrapper gives you every feature of this project as a single command. This page lists all of them. Run `local-26ai.sh --help` to see the same list in your terminal.
 
 ```bash
 local-26ai.sh <command> [arguments]
 ```
 
 <Aside type="tip" title="Direct script access">
-  Every command is a script in the `./scripts` folder, so `local-26ai.sh
-  create-user movies` and `./scripts/create-user.sh movies` are equivalent.
+  Every command is a script in the `./scripts` folder. `local-26ai.sh create-user
+  movies` and `./scripts/create-user.sh movies` do the same.
 </Aside>
 
 ## Containers
@@ -23,7 +23,7 @@ local-26ai.sh <command> [arguments]
 | Command | Description |
 | ------- | ----------- |
 | `start` | Start the database and ORDS containers. |
-| `stop` | Gracefully shut down the database, then stop the containers. |
+| `stop` | Shut the database down cleanly, then stop the containers. |
 
 See [Common Tasks → Managing Containers](/products/uc-local-apex-dev/docs/getting-started/common-tasks/#managing-containers).
 
@@ -31,9 +31,9 @@ See [Common Tasks → Managing Containers](/products/uc-local-apex-dev/docs/gett
 
 | Command | Description |
 | ------- | ----------- |
-| `create-user <name>` | Create a database schema and APEX workspace with all development grants. Use `--skip-workspace` for a schema only, `--compress` to store its data compressed. |
-| `clear-schema <name>` | Drop all objects in a schema, keeping the schema itself. Great for re-testing install scripts. `-y` skips the confirmation. |
-| `drop-user <name>` | Completely remove a schema including its tablespace and datafile. `-y` skips the confirmation. |
+| `create-user <name>` | Create a database schema and an APEX workspace with all development grants. Use `--skip-workspace` for a schema only. Use `--compress` to store the data compressed. |
+| `clear-schema <name>` | Drop all objects in a schema and keep the schema itself. Use it to test an install script many times. `-y` skips the confirmation. |
+| `drop-user <name>` | Drop a schema with its tablespace and datafile. `-y` skips the confirmation. |
 
 See [Creating Users](/products/uc-local-apex-dev/docs/getting-started/creating-users/).
 
@@ -41,13 +41,13 @@ See [Creating Users](/products/uc-local-apex-dev/docs/getting-started/creating-u
 
 | Command | Description |
 | ------- | ----------- |
-| `backup-all` | DataPump-export every schema including APEX workspaces, applications, and ORDS modules to `./backups/export`. |
-| `backup-user <name>` | DataPump-export a single schema including its APEX workspace and applications. |
-| `import-backup <name>` | Restore a schema from a previous backup. Creates the user first if it doesn't exist. |
-| `import-datapump <name> [-rs <target>]` | Import a DataPump dump for a schema. With `-rs` the dump is remapped into a different schema name. |
-| `import-all` | Import every export file found in `./backups/import` — useful for bulk migration. |
-| `sync-backups-folder` | Copy `./backups/import` into the container's DataPump directory and pull new exports back out. |
-| `fix-ws-group-ids` | Remove problematic group IDs from APEX workspace export files in `./backups/import` so they re-import cleanly. |
+| `backup-all` | Export every schema with DataPump to `./backups/export`, with the APEX workspaces, applications, and ORDS modules. |
+| `backup-user <name>` | Export a single schema with DataPump, with its APEX workspace and applications. |
+| `import-backup <name>` | Restore a schema from a backup. If the user does not exist, the script creates it first. |
+| `import-datapump <name> [-rs <target>]` | Import a DataPump dump for a schema. With `-rs` the script imports the dump into a different schema name. |
+| `import-all` | Import every export file in `./backups/import`. Use it during a migration. |
+| `sync-backups-folder` | Copy `./backups/import` into the DataPump directory of the container, and copy new exports back out. |
+| `fix-ws-group-ids` | Delete the group IDs from the APEX workspace export files in `./backups/import`, so the files import correctly. |
 
 See [Backups](/products/uc-local-apex-dev/docs/getting-started/backups/) and [Common Tasks → Workspace Import/Export](/products/uc-local-apex-dev/docs/getting-started/common-tasks/#workspace-importexport).
 
@@ -55,8 +55,8 @@ See [Backups](/products/uc-local-apex-dev/docs/getting-started/backups/) and [Co
 
 | Command | Description |
 | ------- | ----------- |
-| `test-app-install <file.sql>` | Install an APEX application export into the clean `UC_TESTINSTALL_1` schema and report object counts, invalid objects, and dependency scan results. `-y` skips the confirmation. |
-| `test-script-install <file.sql>` | Run any SQL script in the clean `UC_TESTINSTALL_1` schema and report object counts and invalid objects. `-y` skips the confirmation. |
+| `test-app-install <file.sql>` | Install an APEX application export into the clean `UC_TESTINSTALL_1` schema. Shows object counts, invalid objects, and the results of the dependency scan. `-y` skips the confirmation. |
+| `test-script-install <file.sql>` | Run any SQL script in the clean `UC_TESTINSTALL_1` schema. Shows object counts and invalid objects. `-y` skips the confirmation. |
 
 See [Install Apps or Scripts](/products/uc-local-apex-dev/docs/getting-started/install-apps-scripts/).
 
@@ -64,9 +64,9 @@ See [Install Apps or Scripts](/products/uc-local-apex-dev/docs/getting-started/i
 
 | Command | Description |
 | ------- | ----------- |
-| `used-space` | Show database space usage against the 12GB Free-edition limit, per tablespace. |
+| `used-space` | Show the used database space per tablespace, against the 12GB limit of the Free edition. |
 | `shrink-space` | Shrink tablespaces and datafiles to reclaim unused space. |
-| `compress-space <name>` | Enable Advanced Compression on a schema's tablespace, rebuild its objects compressed, and return the freed space to the OS. `-y` skips the confirmation. |
+| `compress-space <name>` | Enable Advanced Compression on the tablespace of a schema, rebuild its objects in compressed form, and return the free space to the operating system. `-y` skips the confirmation. |
 
 See [Common Tasks → Maintenance Tasks](/products/uc-local-apex-dev/docs/getting-started/common-tasks/#maintenance-tasks).
 
@@ -74,11 +74,11 @@ See [Common Tasks → Maintenance Tasks](/products/uc-local-apex-dev/docs/gettin
 
 | Command | Description |
 | ------- | ----------- |
-| `after-first-db-start` | Install APEX and apply dev-friendly defaults. Run automatically by `install.sh` — you only need it for manual setups. |
-| `upgrade-apex` | Download the latest APEX version, run the installer, copy the images, and reapply workspace settings. |
-| `unexpire-accounts` | Unlock and unexpire APEX/ORDS accounts — the fix for "Account Is Locked" messages. |
-| `disable-password-expiration` | Stop database account passwords from expiring in the future. |
-| `disable-archive-logs` | Disable archive logging to save disk space (recommended for dev). |
+| `after-first-db-start` | Install APEX and apply the defaults for development. `install.sh` runs this command. You need it only for a manual installation. |
+| `upgrade-apex` | Download the latest APEX version, run the installer, copy the images, and set the workspace settings again. |
+| `unexpire-accounts` | Unlock the APEX and ORDS accounts. This corrects an "Account Is Locked" message. |
+| `disable-password-expiration` | Stop the passwords of database accounts from expiring. |
+| `disable-archive-logs` | Disable archive logging to save disk space. Archive logs are not necessary in development. |
 | `create-self-signed-certificates` | Create self-signed SSL certificates so ORDS serves HTTPS on port 8443. Run with `sudo`. |
 | `install-dbms-cloud` | Install the `DBMS_CLOUD` package into the database. |
 

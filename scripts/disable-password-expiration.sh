@@ -6,21 +6,17 @@ set -e
 source ./scripts/util/load_env.sh
 
 sql -name "$DB_CONN_NAME" <<SQL
-declare
-  l_username varchar2(100);
-begin
-  select creator
-    into l_username
-    from PUBLICSYN where SNAME = 'APEX_UTIL'
-   fetch first 1 row only;
+alter profile default limit password_life_time unlimited;
 
-  execute IMMEDIATE ' update ' || l_username || q'!.wwv_flow_platform_prefs
-        set VALUE = 10000
-      where NAME = 'ACCOUNT_LIFETIME_DAYS'
-  !';
+begin
+  -- APEX workspace account lifetime via the supported public API instead of
+  -- poking wwv_flow_platform_prefs directly. 9999 is the max the API allows
+  -- (validated against [1-9][0-9]{0,3}); ~27 years, i.e. effectively never for
+  -- a dev environment. The old direct table update used 10000 to bypass this.
+  apex_instance_admin.set_parameter('ACCOUNT_LIFETIME_DAYS', 9999);
   commit;
 end;
 /
 SQL
 
-echo "Disabled password expiration for APEX workspace accounts."
+echo "Disabled password expiration for DB accounts (default profile) and APEX workspace accounts."

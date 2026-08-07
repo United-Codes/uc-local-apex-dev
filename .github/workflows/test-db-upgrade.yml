@@ -5,6 +5,29 @@ name: Test DB upgrade
 # image tag on the SAME oradata volume and asserts nothing was lost or
 # invalidated. Run this when Oracle ships a new Free DB patch, e.g.
 # container-registry.oracle.com/database/free:23.26.2.0.
+#
+# IMPORTANT -- what "upgrades in place" really means:
+#
+# Swapping the image tag does NOT upgrade the data dictionary. The Oracle Free
+# entrypoint only relinks the configuration files and opens whatever database is
+# already on the volume; it contains no upgrade logic. Your data survives intact,
+# but every dictionary object added by a skipped release update is silently
+# missing, and the in-database JVM breaks (ORA-29548) while dba_registry still
+# reports JAVAVM VALID.
+#
+# Neither supported tool fixes this: `datapatch` matches on the RU patch ID
+# (identical across 23.26.x) and says "No release update patches need to be
+# installed" -- then overwrites dba_registry_history, destroying the only
+# evidence -- and `catctl.pl catupgrd.sql` compares only "23.0.0.0.0" and says
+# "Container Database is already at current version".
+#
+# So this workflow does three things, in order:
+#   1. proves the data and APEX survive the swap (the original purpose),
+#   2. records the dictionary gap the swap opened,
+#   3. runs scripts/repair-ru-dictionary.sh and proves it closes the gap
+#      WITHOUT disturbing the data or APEX.
+#
+# Verified on 2026-08-06 for 23.26.0 -> 23.26.2 and 23.26.1 -> 23.26.2.
 on:
   workflow_dispatch:
     inputs:
@@ -46,15 +69,18 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Install sqlv and SQLcl 26.1.2
+      # Oracle's "latest" SQLcl zip, extracted straight to $HOME/sqlcl. We used
+      # to pin a version through sqlv, but its index only carries the two
+      # releases Oracle currently advertises, so a pin breaks as soon as Oracle
+      # rotates them.
+      - name: Install SQLcl (latest)
         run: |
           set -euo pipefail
-          curl -fsSL https://raw.githubusercontent.com/United-Codes/sqlv/main/install.sh | bash
-          export PATH="$HOME/sqlv/bin:$HOME/sqlv/current/bin:$PATH"
-          sqlv install 26.1.2
-          echo "$HOME/sqlv/bin" >> "$GITHUB_PATH"
-          echo "$HOME/sqlv/current/bin" >> "$GITHUB_PATH"
-          sql -V
+          curl -fsSL -o "$RUNNER_TEMP/sqlcl.zip" \
+            https://download.oracle.com/otn_software/java/sqldeveloper/sqlcl-latest.zip
+          unzip -q "$RUNNER_TEMP/sqlcl.zip" -d "$HOME"
+          echo "$HOME/sqlcl/bin" >> "$GITHUB_PATH"
+          "$HOME/sqlcl/bin/sql" -V
 
       # Bring up the currently-pinned DB + APEX + ORDS on a fresh oradata volume.
       - name: Install current version
@@ -106,6 +132,39 @@ jobs:
           grep -qx 'apex_apps_view_ok=yes'        apex-baseline.out
           grep -qx 'apex_workspaces_view_ok=yes'  apex-baseline.out
 
+      # Baseline the dictionary too. A freshly installed database MUST look
+      # clean here -- that is what makes the post-upgrade findings attributable
+      # to the swap, and it is a real test of the detector: if this step ever
+      # reports missing views or a broken JVM on a fresh install, the probe list
+      # or the tool is wrong, not the database.
+      - name: Baseline dictionary + JVM (pre-upgrade)
+        run: |
+          set -euo pipefail
+          # shellcheck disable=SC1091
+          source ./scripts/util/load_env.sh
+
+          sql -S -name "${DB_CONN_NAME}" \
+            @"$PWD/.github/fixtures/upgrade/verify-dictionary.sql" \
+            | sed 's/[[:space:]]*$//' | tee dict-baseline.out
+
+          # The JVM must work, and the registry flag must agree with reality.
+          grep -qx 'jvm_ok=yes'              dict-baseline.out
+          grep -qx 'javavm_registry=VALID'   dict-baseline.out
+          grep -qx 'non_valid_components=0'  dict-baseline.out
+          # The 6 ASSERT*$ base tables ship in every 23.26.x image.
+          grep -qx 'assertion_base_tables=6' dict-baseline.out
+          # sys_invalid_objects is RECORDED, not asserted to be 0. A fresh
+          # install can legitimately leave a few SYS objects invalid (audit
+          # views, for example). The post-repair step asserts this number did
+          # not grow, which is the property that actually matters.
+          sed -n 's/^sys_invalid_objects=//p' dict-baseline.out
+
+          # Same picture from the tool's own machine-readable mode. This is the
+          # control run: on a healthy database it must find nothing to repair.
+          ./scripts/repair-ru-dictionary.sh --summary | tee dict-tool-baseline.out
+          grep -qx 'missing_repairable=0' dict-tool-baseline.out
+          grep -qx 'jvm_ok=yes'           dict-tool-baseline.out
+
       - name: Stop database (graceful shutdown)
         run: ./local-26ai.sh stop
 
@@ -126,8 +185,13 @@ jobs:
 
       # ./local-26ai.sh start runs `docker compose up -d`, which pulls the new
       # tag and recreates the DB container against the existing oradata volume.
-      # The Oracle entrypoint then runs the in-place upgrade automatically.
-      - name: Start new version (in-place upgrade)
+      #
+      # The Oracle entrypoint does NOT upgrade anything here -- it relinks the
+      # configuration files and opens the existing database. The datafiles are
+      # forward-compatible (which is what the data assertions below prove), but
+      # the dictionary stays at the RU that created the volume. The dictionary
+      # steps further down deal with that.
+      - name: Start new version (datafiles opened by the new binaries)
         run: ./local-26ai.sh start
 
       - name: Wait for upgraded database to be ready
@@ -219,6 +283,305 @@ jobs:
           grep -qx  'audit_after=5'    writes.out
           grep -qE '^seq_next=[0-9]+$' writes.out
 
+      # ---------------------------------------------------------------------
+      # Dictionary gap: record it, repair it, prove the repair was safe.
+      # ---------------------------------------------------------------------
+
+      # Deliberately NON-asserting. The size of the gap depends on how many RUs
+      # the tag jump skipped, and Oracle could ship an image that closes it. So
+      # this step documents what the swap did rather than demanding a specific
+      # amount of breakage -- the hard assertions come after the repair.
+      - name: Record dictionary gap (post-upgrade, pre-repair)
+        run: |
+          set -euo pipefail
+          # shellcheck disable=SC1091
+          source ./scripts/util/load_env.sh
+
+          sql -S -name "${DB_CONN_NAME}" \
+            @"$PWD/.github/fixtures/upgrade/verify-dictionary.sql" \
+            | sed 's/[[:space:]]*$//' | tee dict-post-upgrade.out
+
+          ./scripts/repair-ru-dictionary.sh --summary | tee dict-tool-post-upgrade.out
+
+          {
+            echo "### Dictionary state after the image swap, before repair"
+            echo
+            echo '```'
+            cat dict-tool-post-upgrade.out
+            echo '```'
+            echo
+            echo "Baseline (pre-upgrade) for comparison:"
+            echo
+            echo '```'
+            cat dict-tool-baseline.out
+            echo '```'
+            echo
+            echo "Differences introduced by the swap:"
+            echo
+            echo '```'
+            diff dict-tool-baseline.out dict-tool-post-upgrade.out || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          # dictionary_ru must still name the RU that CREATED the volume. If it
+          # already matches the new binaries, something ran datapatch and wiped
+          # the provenance -- worth knowing about loudly.
+          if diff -q <(grep '^dictionary_ru=' dict-baseline.out) \
+                     <(grep '^dictionary_ru=' dict-post-upgrade.out) >/dev/null; then
+            echo "dictionary_ru unchanged by the swap, as expected."
+          else
+            echo "::warning::dictionary_ru changed during the swap -- did something run datapatch?"
+          fi
+
+      - name: Repair the dictionary
+        run: |
+          set -euo pipefail
+          # shellcheck disable=SC1091
+          source ./scripts/util/load_env.sh
+
+          # --yes because there is no TTY. The script reloads Oracle's own
+          # catalog scripts (apply scripts -> view scripts -> utlrp -> package
+          # bodies -> JVM -> validate_components) via catcon.pl in every
+          # container. The JVM reload is the slow part, a few minutes.
+          ./scripts/repair-ru-dictionary.sh --repair --yes 2>&1 | tee repair.out
+
+      # The whole point: the repair must close the gap completely.
+      - name: Verify dictionary is clean (post-repair)
+        run: |
+          set -euo pipefail
+          # shellcheck disable=SC1091
+          source ./scripts/util/load_env.sh
+
+          sql -S -name "${DB_CONN_NAME}" \
+            @"$PWD/.github/fixtures/upgrade/verify-dictionary.sql" \
+            | sed 's/[[:space:]]*$//' | tee dict-post-repair.out
+
+          ./scripts/repair-ru-dictionary.sh --summary | tee dict-tool-post-repair.out
+
+          # Nothing left that this Oracle home is able to create.
+          grep -qx 'missing_repairable=0'    dict-tool-post-repair.out
+
+          # The JVM works AND the registry flag agrees with reality.
+          grep -qx 'jvm_ok=yes'              dict-post-repair.out
+          grep -qx 'javavm_registry=VALID'   dict-post-repair.out
+
+          # No collateral damage to components.
+          grep -qx 'non_valid_components=0'  dict-post-repair.out
+
+          # And no NEW invalid SYS objects versus the pre-upgrade baseline.
+          # This is the assertion that catches the ORA-00947
+          # XS_DATA_SECURITY_INT / XS_SECURITY_CLASS_INT failure -- what happens
+          # when an apply script changes a base table's shape but its package
+          # bodies are not reloaded. That is the exact trap the repair's heal
+          # loop exists for, so it must never be visible here.
+          base_sysinv=$(sed -n 's/^sys_invalid_objects=//p' dict-baseline.out)
+          now_sysinv=$(sed -n 's/^sys_invalid_objects=//p' dict-post-repair.out)
+          echo "sys_invalid_objects: baseline=$base_sysinv post-repair=$now_sysinv"
+          test "${now_sysinv:-0}" -le "${base_sysinv:-0}"
+
+          # The base tables ship in every 23.26.x image, so this one is absolute.
+          grep -qx 'assertion_base_tables=6'   dict-post-repair.out
+
+          # Assertion views/privileges: never fewer than the baseline. Not pinned
+          # to 12/4, because the views arrived in RU 23.26.1 -- a run targeting
+          # 23.26.0 would legitimately have 0 and must not fail. Completeness is
+          # already guaranteed by missing_repairable=0 above, which is computed
+          # against what this Oracle home can actually create.
+          for k in assertion_views assertion_privs; do
+            b=$(sed -n "s/^${k}=//p" dict-baseline.out)
+            a=$(sed -n "s/^${k}=//p" dict-post-repair.out)
+            echo "$k: baseline=$b post-repair=$a"
+            test "${a:-0}" -ge "${b:-0}"
+          done
+
+          # When the target home ships the assertion views, all 12 must exist.
+          # Derived from the home rather than hardcoded per tag.
+          if [ "$(sed -n 's/^assertion_views=//p' dict-post-repair.out)" != "0" ]; then
+            grep -qx 'assertion_views=12' dict-post-repair.out
+            grep -qx 'assertion_privs=4'  dict-post-repair.out
+          fi
+
+          # Deep Data Security views (RU 23.26.2). Not pinned to 9, because a
+          # pre-23.26.2 target never shipped them -- instead assert the count
+          # never went DOWN relative to the pre-upgrade baseline. The real
+          # "nothing missing" guarantee is missing_repairable=0 above, which is
+          # computed against what this Oracle home can actually create.
+          base_ddsec=$(sed -n 's/^ddsec_views=//p' dict-baseline.out)
+          now_ddsec=$(sed -n 's/^ddsec_views=//p' dict-post-repair.out)
+          echo "ddsec_views: baseline=$base_ddsec post-repair=$now_ddsec"
+          test "${now_ddsec:-0}" -ge "${base_ddsec:-0}"
+
+          # The repair ran Oracle's apply scripts, so at least one backport is
+          # now recorded -- proof the base-table/privilege half actually ran and
+          # not just the CREATE OR REPLACE VIEW half. (An earlier version of the
+          # tool created the views but never the privileges, leaving
+          # `create assertion` failing with ORA-00901 while DBA_ASSERTIONS
+          # worked. This assertion is what catches that regression.)
+          backports=$(sed -n 's/^registry_backports=//p' dict-post-repair.out)
+          echo "registry_backports=$backports"
+          test "${backports:-0}" -gt 0
+
+          {
+            echo "### Dictionary state after repair"
+            echo
+            echo '```'
+            cat dict-tool-post-repair.out
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # The repair rewrites SYS objects, so re-run every data and APEX
+      # assertion. This is the step that would catch a repair that "fixed" the
+      # dictionary by breaking the application.
+      - name: Verify data and APEX survived the repair
+        run: |
+          set -euo pipefail
+          # shellcheck disable=SC1091
+          source ./scripts/util/load_env.sh
+
+          sql -S -name "${DB_CONN_BASE}-upgrade_test" \
+            @"$PWD/.github/fixtures/upgrade/verify.sql" \
+            | sed 's/[[:space:]]*$//' | tee post-repair.out
+
+          # Identical to the post-upgrade snapshot, including version_full.
+          diff post.out post-repair.out
+
+          # And identical to the pre-upgrade baseline apart from version_full.
+          diff <(grep -v '^version_full=' baseline.out) \
+               <(grep -v '^version_full=' post-repair.out)
+
+          sql -S -name "${DB_CONN_NAME}" \
+            @"$PWD/.github/fixtures/upgrade/verify-apex.sql" \
+            | sed 's/[[:space:]]*$//' | tee apex-post-repair.out
+
+          # APEX must be byte-identical to the pre-upgrade baseline: same
+          # version, same per-type object counts, nothing invalidated.
+          diff apex-baseline.out apex-post-repair.out
+
+      # Functional probes, not just counts: the feature the gap removed must now
+      # actually work, and APEX must still serve requests.
+      - name: Functional probes (post-repair)
+        run: |
+          set -euo pipefail
+          # shellcheck disable=SC1091
+          source ./scripts/util/load_env.sh
+
+          # SQL Assertions end to end: create one, prove it enforces
+          # (ORA-08601), then drop it. Runs in the PDB as SYS.
+          sql -S -name "${DB_CONN_NAME}" <<'SQL' | sed 's/[[:space:]]*$//' | tee assert.out
+          set heading off feedback off pagesize 0 serveroutput on
+          -- Plain BEGIN, no DECLARE: an empty declaration section is an ORA-06550
+          -- syntax error. Nested blocks below declare their own variables.
+          begin
+            begin execute immediate 'grant create assertion to upgrade_test';
+            exception when others then dbms_output.put_line('grant_err=' || sqlerrm); end;
+
+            -- The predicate MUST target a column with no existing constraint,
+            -- otherwise the constraint fires first and the probe is a false
+            -- positive. departments.dept_name is NOT NULL and
+            -- employees.salary has CHECK (salary > 0), so both of those would
+            -- raise ORA-01400 / ORA-02290 and look like enforcement.
+            -- employees.hired_on is unconstrained, so a future date can only be
+            -- rejected by the assertion.
+            begin
+              execute immediate q'[create assertion upgrade_test.a_no_future_hire
+                check (not exists (select 1 from upgrade_test.employees e
+                                    where e.hired_on > date '2999-01-01'))]';
+              dbms_output.put_line('assertion_created=yes');
+            exception when others then
+              dbms_output.put_line('assertion_created=no');
+              dbms_output.put_line('assertion_error=' || sqlerrm);
+            end;
+
+            begin
+              execute immediate q'[insert into upgrade_test.employees
+                (emp_name, dept_id, salary, hired_on)
+                values ('Assertion Probe',
+                        (select min(dept_id) from upgrade_test.departments),
+                        1, date '3000-01-01')]';
+              dbms_output.put_line('assertion_enforced=no');
+              rollback;
+            exception when others then
+              -- Assert on the SPECIFIC code. ORA-08601 is "SQL assertion
+              -- violated"; anything else means some other rule blocked the
+              -- insert and the assertion was never exercised.
+              dbms_output.put_line('assertion_sqlcode=' || sqlcode);
+              if sqlcode = -8601 then
+                dbms_output.put_line('assertion_enforced=yes');
+              else
+                dbms_output.put_line('assertion_enforced=no');
+                dbms_output.put_line('assertion_block_reason=' || sqlerrm);
+              end if;
+              rollback;
+            end;
+
+            begin execute immediate 'drop assertion upgrade_test.a_no_future_hire';
+            exception when others then null; end;
+
+            -- DBA_ASSERTIONS must be queryable (ORA-00942 before the repair).
+            declare n number;
+            begin
+              execute immediate 'select count(*) from dba_assertions' into n;
+              dbms_output.put_line('dba_assertions_ok=yes');
+            exception when others then
+              dbms_output.put_line('dba_assertions_ok=no');
+            end;
+          end;
+          /
+          exit
+          SQL
+
+          grep -qx 'assertion_created=yes'  assert.out
+          grep -qx 'assertion_enforced=yes' assert.out
+          grep -qx 'assertion_sqlcode=-8601' assert.out   # ORA-08601, not some other rule
+          grep -qx 'dba_assertions_ok=yes'  assert.out
+
+          # The in-database JVM must be callable, not merely flagged VALID.
+          sql -S -name "${DB_CONN_NAME}" <<'SQL' | sed 's/[[:space:]]*$//' | tee jvm.out
+          set heading off feedback off pagesize 0 serveroutput on
+          whenever sqlerror exit failure
+          declare v varchar2(4000);
+          begin
+            v := dbms_java.longname('TEST');
+            dbms_output.put_line('jvm_call_ok=yes');
+          end;
+          /
+          exit
+          SQL
+          grep -qx 'jvm_call_ok=yes' jvm.out
+
+          # APEX still functions beyond being queryable.
+          sql -S -name "${DB_CONN_NAME}" <<'SQL' | sed 's/[[:space:]]*$//' | tee apexfn.out
+          set heading off feedback off pagesize 0 serveroutput on
+          whenever sqlerror exit failure
+          declare n number;
+          begin
+            apex_util.set_workspace(p_workspace => 'INTERNAL');
+            dbms_output.put_line('apex_set_workspace=ok');
+            select count(*) into n from apex_appl_pages where rownum <= 1;
+            dbms_output.put_line('apex_pages_view_ok=yes');
+          end;
+          /
+          exit
+          SQL
+          grep -qx 'apex_set_workspace=ok'  apexfn.out
+          grep -qx 'apex_pages_view_ok=yes' apexfn.out
+
+      # Re-running --repair on an already-clean database must be a no-op. This
+      # guards the idempotency the tool relies on (view scripts are CREATE OR
+      # REPLACE; every privilege-map INSERT in an apply script is preceded by a
+      # DELETE of the same key).
+      - name: Repair is idempotent
+        run: |
+          set -euo pipefail
+          # shellcheck disable=SC1091
+          source ./scripts/util/load_env.sh
+
+          ./scripts/repair-ru-dictionary.sh --repair --yes 2>&1 | tee repair2.out
+          grep -q 'Nothing to repair' repair2.out
+
+          ./scripts/repair-ru-dictionary.sh --summary | tee dict-tool-idem.out
+          diff dict-tool-post-repair.out dict-tool-idem.out
+
       - name: Collect logs on failure
         if: failure()
         run: |
@@ -227,7 +590,18 @@ jobs:
           docker compose logs --no-color ords-26ai > artifacts/ords.log 2>&1 || true
           docker compose ps > artifacts/ps.txt 2>&1 || true
           docker compose config > artifacts/compose-resolved.yml 2>&1 || true
-          cp -f apex-baseline.out apex-post.out artifacts/ 2>/dev/null || true
+          cp -f apex-baseline.out apex-post.out apex-post-repair.out artifacts/ 2>/dev/null || true
+          cp -f baseline.out post.out post-repair.out artifacts/ 2>/dev/null || true
+          # Dictionary snapshots + the repair transcript: these are what you read
+          # to tell "the swap broke it" from "the repair broke it".
+          cp -f dict-baseline.out dict-post-upgrade.out dict-post-repair.out artifacts/ 2>/dev/null || true
+          cp -f dict-tool-baseline.out dict-tool-post-upgrade.out dict-tool-post-repair.out artifacts/ 2>/dev/null || true
+          cp -f repair.out repair2.out assert.out jvm.out apexfn.out artifacts/ 2>/dev/null || true
+          # catcon.pl per-container logs from the repair -- the only place the
+          # individual catalog-script errors are recorded.
+          docker exec "${CONTAINER_NAME:-local-26ai}" \
+            bash -lc 'tar czf - -C /tmp rurepair 2>/dev/null' \
+            > artifacts/rurepair-logs.tar.gz 2>/dev/null || true
 
       - name: Upload failure artifacts
         if: failure()

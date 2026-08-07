@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# desc: Unlock and unexpire APEX/ORDS accounts (fixes "Account Is Locked")
+# desc: Unlock and unexpire DB and APEX/ORDS accounts (fixes "Account Is Locked")
 
 set -e
 
@@ -9,17 +9,29 @@ sql -name "$DB_CONN_NAME" <<SQL
 set serveroutput on
 
 DECLARE
-  c_username CONSTANT VARCHAR2(128) := 'APEX_PUBLIC_USER';
   l_unexpire_command VARCHAR2(4000);
 BEGIN
-  EXECUTE IMMEDIATE 'ALTER USER ' || c_username || ' ACCOUNT UNLOCK';
+  EXECUTE IMMEDIATE 'ALTER USER APEX_PUBLIC_USER ACCOUNT UNLOCK';
 
-  SELECT 'alter user ' || name || q'< identified by values '>' || spare4 || ';' || password || q'<'>'
-    INTO l_unexpire_command
-    FROM sys.user$
-   WHERE name = c_username;
-
-  EXECUTE IMMEDIATE l_unexpire_command;
+  -- re-applying the stored password hash clears the expiry state without
+  -- changing the password
+  FOR acc IN (
+    SELECT u.username, s.spare4, s.password
+      FROM sys.dba_users u
+      JOIN sys.user$ s ON s.name = u.username
+     WHERE u.username = 'APEX_PUBLIC_USER'
+        OR (u.oracle_maintained = 'N' AND u.account_status LIKE '%EXPIRED%')
+  ) LOOP
+    BEGIN
+      l_unexpire_command := 'alter user "' || acc.username || q'<" identified by values '>'
+        || acc.spare4 || ';' || acc.password || q'<'>';
+      EXECUTE IMMEDIATE l_unexpire_command;
+      dbms_output.put_line('Unexpired DB account ' || acc.username);
+    EXCEPTION
+      WHEN OTHERS THEN
+        dbms_output.put_line('Error unexpiring DB account ' || acc.username || ': ' || sqlerrm);
+    END;
+  END LOOP;
 END;
 /
 
@@ -52,4 +64,4 @@ end;
 
 SQL
 
-echo "Unexpired APEX_PUBLIC_USER and APEX workspace accounts."
+echo "Unexpired DB accounts (incl. APEX_PUBLIC_USER) and APEX workspace accounts."

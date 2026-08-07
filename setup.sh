@@ -23,14 +23,27 @@ echo "CONTAINER_NAME=local-26ai" >>.env
 echo "DBSERVICENAME=\"FREEPDB1\"" >>.env
 echo "DBHOST=\"26ai\"" >>.env
 echo "DBPORT=\"1521\"" >>.env
-echo "FORCE_SECURE=\"false\"" >>.env
+# SECURE_MODE is this project's own hardening flag (see install.sh --secure).
+# Deliberately NOT named FORCE_SECURE: the Oracle ORDS image reads FORCE_SECURE
+# from this shared env_file and would refuse to boot without TLS certs.
+echo "SECURE_MODE=\"false\"" >>.env
+# ORDS debug-to-screen (maps to the container's DEBUG env in docker-compose.yml).
+# Default on for dev; install.sh --secure flips it to false. NOT named ORDS_DEBUG:
+# that is a reserved variable inside the ORDS image's `ords` launcher (it holds
+# JVM -agentlib:jdwp options) and setting it here breaks the ORDS install.
+echo "DEBUG_TO_SCREEN=\"true\"" >>.env
 
 echo "Created .env file"
 
-# create ords-config directory if not exists
+# create bind-mount dirs if not exists. chmod 777 so the ORDS container's mapped
+# user can write them under rootless podman.
 if [ ! -d ./ords-config ]; then
   mkdir ./ords-config
   chmod 777 ./ords-config
+fi
+if [ ! -d ./apex-images ]; then
+  mkdir ./apex-images
+  chmod 777 ./apex-images
 fi
 
 mkdir -p ./backups/export
