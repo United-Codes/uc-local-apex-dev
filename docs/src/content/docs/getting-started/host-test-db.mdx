@@ -1,0 +1,79 @@
+---
+title: Host as a Test Database
+description: Install uc-local-apex-dev in secure mode to host it as a shared test database. What the --secure flag disables, what it does not do, and what to do before you expose it.
+sidebar:
+  order: 8
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+This stack is for **local** development. It is insecure by default.
+
+<Aside type="caution" title="Never host this as a production database">
+  Do not use this environment for production data. It stores the passwords in
+  plain text and relaxes the security features of the database. Use it as a
+  **test** database only.
+</Aside>
+
+## Install with secure mode
+
+To host the stack as a test database, install it with the `--secure` flag:
+
+```bash
+./install.sh --secure
+```
+
+You can run this command again on an existing installation. It is safe to repeat.
+
+## What secure mode does
+
+Secure mode disables the ORDS surfaces that work without an application login:
+
+- The ORDS Database REST API (`database.api.enabled`)
+- SQL Developer Web and Database Actions (`feature.sdw`, `/ords/sql-developer`)
+- Debug-to-screen (`debug.printDebugToScreen`)
+
+The APEX runtime and the APEX login continue to work.
+
+Secure mode also changes the password of new workspaces. The `create-user` command
+uses the random `ORACLE_PASSWORD` value instead of the shared `Welcome_1`. This is
+the same result as
+[`WORKSPACE_USE_INTERNAL_PASSWORD=true`](/products/uc-local-apex-dev/docs/getting-started/creating-users/).
+
+## The flags in .env
+
+The installer writes two keys to `.env`:
+
+- `SECURE_MODE="true"` — later `create-user` runs read this key and use the same
+  password rule.
+- `DEBUG_TO_SCREEN="false"` — the ORDS image reads this key on every boot, so
+  debug-to-screen stays off after a restart.
+
+<Aside type="caution" title="Do not rename SECURE_MODE to FORCE_SECURE">
+  The `.env` file is the `env_file` of the ORDS container. The Oracle ORDS image
+  reads `FORCE_SECURE` itself. With `FORCE_SECURE=true` and no certificate files
+  in `/etc/ords/config/ssl/`, the container refuses to start. This project uses
+  the name `SECURE_MODE` to prevent that failure.
+</Aside>
+
+## What secure mode does not do
+
+- It does not close network ports. The database port `1521` and the ORDS ports
+  `8181` and `8443` stay open.
+- It does not change the plaintext secrets in `.env`.
+- It does not disable the MongoDB API with a configuration key. The ORDS image
+  enables `mongo.enabled` on every boot. The API is closed because
+  `docker-compose.yml` does not publish port `27017`.
+
+## Before you host the stack
+
+1. Put the stack behind a firewall. Keep the database port `1521` closed to the
+   outside.
+2. Put ORDS behind a TLS reverse proxy. Read
+   [Expose with HTTPS (Reverse Proxy)](/products/uc-local-apex-dev/docs/getting-started/expose-https-reverse-proxy/).
+3. Change the generated passwords in `.env`.
+4. Delete an old `.env.bak` file. It is a copy of a replaced `.env` file, and it
+   holds the old passwords.
+5. Use strong passwords for the APEX `ADMIN` user and for every workspace user
+   that exists already.
+6. Delete the sample applications and the sample data that must stay private.

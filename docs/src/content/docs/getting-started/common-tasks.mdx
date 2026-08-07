@@ -136,7 +136,9 @@ Run this script after a database migration, or when an account expires after som
 
 #### Disable Password Expiration
 
-Run this script so the passwords of APEX workspace accounts never expire:
+`install.sh` already runs this script, so a new installation needs it only after a
+change to the password profile. Run it so the passwords of APEX workspace accounts
+never expire:
 
 ```bash
 ./scripts/disable-password-expiration.sh

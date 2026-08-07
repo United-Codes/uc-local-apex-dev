@@ -55,7 +55,11 @@ export default defineConfig({
 				},
 				{
 					label: "Getting Started",
-					items: ["getting-started", "other/podman-on-mac"],
+					items: [
+						"getting-started",
+						"getting-started/installation-details",
+						"other/podman-on-mac",
+					],
 				},
 				{
 					label: "Guides",
@@ -66,6 +70,7 @@ export default defineConfig({
 						"getting-started/install-apps-scripts",
 						"getting-started/common-tasks",
 						"getting-started/expose-https-reverse-proxy",
+						"getting-started/host-test-db",
 					],
 				},
 				{

@@ -13,14 +13,13 @@ To reach your environment over a real domain with a valid TLS certificate, run *
 
 <Aside type="caution" title="Not a hardening guide">
   Run the installer in secure mode
-  ([`./install.sh --secure`](/products/uc-local-apex-dev/docs/getting-started/))
+  ([`./install.sh --secure`](/products/uc-local-apex-dev/docs/getting-started/host-test-db/))
   before you do these steps. This setup makes your environment reachable from the
   public internet.
 
 Secure mode disables the ORDS surfaces that work without an application login
-(Database REST API, MongoDB API, SQL Developer Web / Database Actions,
-debug-to-screen). It also uses one password per workspace instead of the shared
-`Welcome_1`.
+(Database REST API, SQL Developer Web / Database Actions, debug-to-screen). It
+also uses one password per workspace instead of the shared `Welcome_1`.
 
 For existing workspaces, use strong passwords for the APEX admin user and the
 workspace users. Delete the sample content that must stay private. Keep the

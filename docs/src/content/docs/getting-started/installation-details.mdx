@@ -1,0 +1,93 @@
+---
+title: Installation Details
+description: What install.sh does step by step, how to select Docker or Podman, how to fix the Podman compose provider, and how to add the scripts to your PATH.
+sidebar:
+  order: 2
+---
+
+This page explains the installer of uc-local-apex-dev. Read
+[Getting Started](/products/uc-local-apex-dev/docs/getting-started/) first for the
+short installation path.
+
+## What install.sh does
+
+1. It makes sure that a container engine (`docker` or `podman`), a compose command, `sql` (SQLcl), `unzip`, and `curl` or `wget` are in your `PATH`.
+2. It runs `./setup.sh` to generate `.env` with a random Oracle SYS password. If `.env` exists and contains all necessary keys, the installer skips this step.
+3. It pulls the container images for the database and ORDS.
+4. It starts the stack with `<engine> compose up -d`.
+5. It waits up to 25 minutes for the database. Then it makes sure that the host can connect with SQLcl. A broken SQLcl or Java installation on the host fails here with a clear error.
+6. It runs `./scripts/after-first-db-start.sh` without questions. This step installs APEX and applies the defaults for development. It disables the archive logs and relaxes the password rules of APEX. It also sets the APEX `INTERNAL`/`ADMIN` password to the `ORACLE_PASSWORD` value from `.env`. The ORDS container completes its own first installation at the same time.
+7. It waits up to 15 minutes for the first installation of ORDS. Then it sets the PL/SQL gateway mode of ORDS to `proxied`. This is the correct mode for APEX.
+8. It restarts the ORDS container, so ORDS reads the new APEX module and the changed configuration. Then it waits for ORDS to start.
+
+For the `--secure` flag, read
+[Host as a Test Database](/products/uc-local-apex-dev/docs/getting-started/host-test-db/).
+
+## If the installation stops
+
+If a wait times out, the installer shows the container logs and stops. Run
+`./install.sh` again. It continues at the step where it stopped.
+
+If the APEX installation itself stopped in the middle, read
+[An APEX upgrade failed halfway. How do I retry it?](/products/uc-local-apex-dev/docs/other/faq/#an-apex-upgrade-failed-halfway-how-do-i-retry-it)
+in the FAQ.
+
+## Select the container engine
+
+The scripts detect the installed engine. They use `docker` when both Docker and
+Podman are installed. To select one engine, set `CONTAINER_CLI` before you run a
+script:
+
+```bash
+CONTAINER_CLI=podman ./install.sh
+```
+
+## Podman compose provider
+
+On Podman the scripts use the native `podman compose` subcommand, which calls a
+compose provider. They do not use the standalone `podman-compose`. That tool does
+not support everything in the `docker-compose.yml` file of this project.
+
+The provider connects to the API socket of Podman. If `podman compose` fails with
+_"Cannot connect to the Docker daemon at unix:///run/user/.../podman/podman.sock"_,
+enable the rootless socket:
+
+```bash
+systemctl --user enable --now podman.socket
+```
+
+On a **headless server over SSH**, also enable lingering. Then the socket stays
+open after you log out:
+
+```bash
+loginctl enable-linger "$USER"
+```
+
+On macOS the Podman machine needs more memory and more CPUs than the default.
+[Read the Podman setup guide for macOS](/products/uc-local-apex-dev/docs/other/podman-on-mac).
+
+## If a script is not executable
+
+The scripts are in the repository with the mode `755`, so they run after a normal
+`git clone`. If your shell reports _"Permission denied"_, set the modes again:
+
+```bash
+chmod +x ./install.sh ./local-26ai.sh ./setup.sh ./scripts/*.sh
+```
+
+Three situations remove the executable bit:
+
+- A clone on a mounted Windows drive under WSL2, for example `/mnt/c/dev/`. That
+  filesystem keeps no Unix modes, so `git` cannot set them. To prevent this, clone
+  into the Linux home directory of WSL2 instead.
+- A clone on exFAT or FAT32, or a repository with `core.fileMode=false`.
+- A download of the ZIP archive from GitHub instead of a `git clone`.
+
+## Free disk space after the installation
+
+The installer unzips APEX into the `apex` folder. The database does not need this
+folder after the installation. To free the disk space, delete it:
+
+```bash
+rm -rf ./apex
+```
