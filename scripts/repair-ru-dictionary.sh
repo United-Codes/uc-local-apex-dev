@@ -209,6 +209,11 @@ DBA_DATA_ROLES DBA_DATA_ROLE_GRANTS
 DBA_END_USER_SECURITY_CONTEXTS
 DBA_END_USER_SECURITY_CONTEXT_ATTRIBUTES
 DBA_END_USER_SECURITY_CONTEXT_DATA_ROLES
+END_USER_CONTEXT
+DBA_END_USER_CONTEXT_DEFINITIONS ALL_END_USER_CONTEXT_DEFINITIONS
+USER_END_USER_CONTEXT_DEFINITIONS
+DBA_END_USERS USER_END_USERS
+DBA_VALIDATION_DIRECTIVES ALL_VALIDATION_DIRECTIVES USER_VALIDATION_DIRECTIVES
 "
 
 NEW_VIEWS_23_26_3="
@@ -219,7 +224,36 @@ DBA_HIST_SERVICE_DRAIN_TIMEOUT_ADVICE
 DBA_HIST_VECTOR_INDEX
 DBA_REQUIRED_PARENT_DATA_PRIVILEGES ALL_REQUIRED_PARENT_DATA_PRIVILEGES
 USER_REQUIRED_PARENT_DATA_PRIVILEGES
+DBA_HIST_DATA_MEMORY_AREA
 "
+# DBA_HIST_DATA_MEMORY_AREA is NOT in Oracle's "Changes in This Release" page.
+# That page lists nine static views for 23.26.3; the home defines more. Do not
+# trust the page alone. Get the real list by diffing the view definitions of the
+# two Oracle homes, which is what found this one:
+#
+#   docker run --rm --entrypoint bash \
+#     container-registry.oracle.com/database/free:<TAG> -c '
+#     H=$(ls -d /opt/oracle/product/*/dbhomeFree); cd $H/rdbms/admin
+#     ls *.sql | grep -vE "^(e|f)[0-9]+\.sql$" | xargs $H/perl/bin/perl -0777 -ne \
+#       "while(/CREATE\s+(?:OR\s+REPLACE\s+)?(?:FORCE\s+)?VIEW\s+(?:SYS\.)?\"?([A-Za-z][A-Za-z0-9_]*)\"?/gi){print uc(\$1),\"\n\"}" \
+#     | sort -u'
+#
+# Run that for the old and the new tag, then `comm -13 old.txt new.txt`.
+# The AWR_ROOT_* / AWR_PDB_* / AWR_CDB_* views that the diff also reports are
+# internal layers under the DBA_HIST_* views. catawrtv.sql builds all of them,
+# so the DBA_HIST_* probes above already cover them.
+#
+# CHECK EVERY CANDIDATE AGAINST A FRESH DATABASE OF THE NEW RU BEFORE YOU ADD
+# IT. The home defining a view does not mean a Free install ever creates it.
+# The 23.26.3 diff also reports ALL/DBA/USER_CATALOG_PROVIDERS, and adding them
+# looked right -- but a fresh 23.26.3 database has neither those views nor the
+# C##ADP$SERVICE user that owns them, because Free does not install Data Studio.
+# They are a false positive: the probe reports "MISSING - repairable" forever,
+# and dbms_catalog_install.sql cannot fix it (ORA-00942 on
+# C##ADP$SERVICE.DBA_CATALOG_PROVIDERS). Its real driver,
+# data_studio_install.sql, would install the whole Data Studio stack that Free
+# deliberately leaves out. So: if the control database does not have the view,
+# it does not belong in this list.
 
 ALL_PROBE_VIEWS="$NEW_VIEWS_23_26_1 $NEW_VIEWS_23_26_2 $NEW_VIEWS_23_26_3"
 
@@ -709,20 +743,78 @@ repair() {
       case " $ascripts " in *" $ascript "*) ;; *) ascripts="$ascripts $ascript" ;; esac
     done
   done
+  # AWR views need their base tables, which no apply script creates.
+  #
+  # catawr*vw.sql only creates views. They select from WRH$_* tables that the
+  # new RU also adds, and those come from catawrtb.sql -- a normal catalog
+  # script, not a backport apply script. So the assumption behind the ordering
+  # below ("apply scripts create the base tables") does not hold for AWR.
+  #
+  # Running catawrvw.sql on its own therefore fails with ORA-00942, and Oracle
+  # still creates the DBA_HIST_* synonym over the view that does not exist. The
+  # synonym then resolves to itself: every later query raises ORA-01775, and
+  # --check keeps reporting the view as missing. Verified on 23.26.2 ->
+  # 23.26.3, which left DBA_HIST_CLIENT_REQUEST_HISTOGRAM,
+  # DBA_HIST_SERVICE_DRAIN_TIMEOUT_ADVICE, DBA_HIST_VECTOR_INDEX and
+  # DBA_HIST_DATA_MEMORY_AREA as dangling synonyms.
+  #
+  # catawrtv.sql is Oracle's own driver for the whole AWR layer. It runs
+  # catawrtb (the tables) first, then catawrrtvw, catawrpdbvw, catawrcdbvw,
+  # catawrvw, catawrhubvw and catawrappvw in that order. Use it instead of any
+  # individual AWR view script, so the ordering stays Oracle's problem.
+  local mapped="" vs
+  for vs in $vscripts; do
+    case "$vs" in catawr*vw.sql) vs="catawrtv.sql" ;; esac
+    case " $mapped " in *" $vs "*) ;; *) mapped="$mapped $vs" ;; esac
+  done
+  vscripts="$mapped"
+
   echo "  View scripts:   ${vscripts:-(none)}"
   echo "  Apply scripts:  ${ascripts:-(none)}"
 
   # Order is deliberate: base tables and privileges first, then the views on
   # top of them. The other way round leaves the views invalid, because they
   # select from base tables that do not exist yet.
-  if [ -n "$ascripts" ]; then
-    step "Running backport apply scripts (base tables, privileges, registry\$backports)"
-    catcon '$ORACLE_HOME/rdbms/admin/backport_files' rurepair_apply $ascripts
-  fi
-  if [ -n "$vscripts" ]; then
-    step "Running view scripts"
-    catcon '$ORACLE_HOME/rdbms/admin' rurepair_views $vscripts
-  fi
+  #
+  # One pass is not always enough. A jump that skips several RUs resolves the
+  # scripts of all of them into one catcon pass, in whatever order the view map
+  # produced. A view script can therefore still run before the apply script that
+  # creates the base table it selects from, and that view stays missing when the
+  # pass ends. Verified on the widest jump, 23.26.0 -> 23.26.3: the first pass
+  # left ALL/DBA/USER_REQUIRED_PARENT_DATA_PRIVILEGES missing and an identical
+  # second pass created them. The 23.26.2 -> 23.26.3 jump converges in one pass.
+  #
+  # So repeat while a pass keeps reducing the number of missing views. Bounded
+  # to 3 rounds, the same guard the heal loop in step 2 uses, and stopped early
+  # as soon as a pass stops helping -- otherwise a view that no script can
+  # create would repeat the whole catalog reload three times for nothing.
+  #
+  # Each round gets its own catcon log basename. Sharing one would re-report the
+  # previous round's Oracle errors as if they had just happened.
+  local pass before after
+  before="$(missing_views | grep -c . || true)"
+  for pass in 1 2 3; do
+    if [ -n "$ascripts" ]; then
+      step "Pass $pass: backport apply scripts (base tables, privileges, registry\$backports)"
+      catcon '$ORACLE_HOME/rdbms/admin/backport_files' "rurepair_apply$pass" $ascripts
+    fi
+    if [ -n "$vscripts" ]; then
+      step "Pass $pass: view scripts"
+      catcon '$ORACLE_HOME/rdbms/admin' "rurepair_views$pass" $vscripts
+    fi
+    after="$(missing_views | grep -c . || true)"
+    if [ "$after" = "0" ]; then
+      echo "  Pass $pass: no missing views left."
+      break
+    fi
+    if [ "$after" -ge "$before" ]; then
+      echo "  Pass $pass left $after view(s) missing and did not improve on $before."
+      echo "  Repeating will not help -- stopping here. See the errors above."
+      break
+    fi
+    echo "  Pass $pass: $after view(s) still missing, was $before -- running the scripts again."
+    before="$after"
+  done
 
   banner "REPAIR STEP 2: recompile, then heal invalid SYS package bodies"
   # An apply script can change a base table's shape while the package bodies
@@ -799,41 +891,91 @@ SQL
 # This runs even when steps 1-3 find nothing to do, because a stale component
 # flag is its own repairable condition: update_javavm_db.sql leaves JAVAVM
 # INVALID with a perfectly working JVM, and nothing else clears it.
+# Each component is validated in its OWN session, and retried once.
+#
+# The validation procedures recompile their own packages. Calling two of them in
+# one session means the second one runs against package state that the first one
+# just invalidated, and it dies with ORA-04061 "existing state of ... has been
+# invalidated". Worse, VALIDATE_APEX catches that internally, reports
+# "ORA-20001: ORA-04061 ..." and then sets the APEX registry flag to INVALID.
+#
+# That is a self-inflicted regression, and it only appears on an install that
+# has APEX: JAVAVM is revalidated first, APEX second, so APEX always loses.
+# Seen on the 23.26.2 -> 23.26.3 CI gate, which went from
+# non_valid_components=0 before the repair to 1 after it, with all 4492 APEX
+# objects still VALID.
+#
+# A fresh session per component removes the cause. The single retry covers the
+# case where the first call is the one that invalidates the state it needs.
 revalidate_invalid_components() {
   banner "REPAIR STEP 4: refresh the status flag of INVALID components only"
-  local con
+  local con comps line comp proc attempt result
   for con in $(list_containers); do
     echo "  -- container $con"
-    # NOTE: "procedure" must be aliased. It is a PL/SQL reserved word, so the
-    # record field reference c.procedure raises ORA-06550 even though the column
-    # selects fine in plain SQL. That silently skipped this whole step once.
-    sqlsys <<SQL
-set feed off serveroutput on lines 200 pages 0
+    # "procedure" is a PL/SQL reserved word, so a record field reference
+    # c.procedure raises ORA-06550 -- but the column selects fine in plain SQL,
+    # which is what this does. Collect first, then act one session at a time.
+    # `|| true` is required: with no INVALID components grep exits 1, and under
+    # `set -e` a failing command substitution in an assignment kills the script.
+    comps="$( { sqlsys <<SQL
+set pages 0 feed off head off lines 200
+alter session set container = $con;
+select comp_id || '|' || procedure from dba_registry
+ where status = 'INVALID' and procedure is not null;
+exit
+SQL
+} | tr -d '\r' | grep -E '^[A-Za-z][A-Za-z0-9_ ]*\|' || true)"
+    if [ -z "$comps" ]; then
+      echo "     no INVALID components -- nothing to revalidate"
+      continue
+    fi
+    echo "$comps" | while IFS='|' read -r comp proc; do
+      [ -z "$comp" ] && continue
+      for attempt in 1 2; do
+        # `|| true` for the same reason as above: no match means grep exits 1,
+        # and `set -e` would kill the whole repair on it.
+        result="$( { sqlsys <<SQL 2>&1
+set feed off serveroutput on lines 400 pages 0
 alter session set container = $con;
 set serveroutput on
-declare
-  n number := 0;
 begin
-  for c in (select comp_id, procedure as proc_name
-              from dba_registry
-             where status = 'INVALID'
-               and procedure is not null) loop
-    n := n + 1;
-    begin
-      execute immediate 'begin ' || c.proc_name || '; end;';
-      dbms_output.put_line('     revalidated ' || c.comp_id || ' via ' || c.proc_name);
-    exception when others then
-      dbms_output.put_line('     ' || c.comp_id || ' validation FAILED: ' || sqlerrm);
-    end;
-  end loop;
-  if n = 0 then
-    dbms_output.put_line('     no INVALID components -- nothing to revalidate');
-  end if;
+  $proc;
+  dbms_output.put_line('RUREPAIR_OK');
+exception when others then
+  dbms_output.put_line('RUREPAIR_ERR ' || sqlerrm);
 end;
 /
 exit
 SQL
+} | tr -d '\r' | grep -E '^(RUREPAIR_OK|RUREPAIR_ERR)' || true)"
+        # VALIDATE_APEX swallows its own failure and reports it as a successful
+        # call, so trust dba_registry over the return, not the other way round.
+        case "$result" in
+          RUREPAIR_OK*)
+            if component_is_valid "$con" "$comp"; then
+              echo "     revalidated $comp via $proc"
+              break
+            fi
+            echo "     $comp still not VALID after $proc (attempt $attempt)"
+            ;;
+          *) echo "     $comp validation FAILED (attempt $attempt): ${result#RUREPAIR_ERR }" ;;
+        esac
+        [ "$attempt" = "2" ] && echo "     $comp LEFT NOT VALID -- run $proc by hand in a fresh session"
+      done
+    done
   done
+}
+
+# Is one component VALID (or OPTION OFF, which is a legitimate end state)?
+component_is_valid() {
+  local con="$1" comp="$2"
+  sqlsys <<SQL | tr -d '\r ' | grep -qx 'RUREPAIR_VALID'
+set pages 0 feed off head off lines 200
+alter session set container = $con;
+select case when status in ('VALID','OPTION OFF') then 'RUREPAIR_VALID' else 'RUREPAIR_NOTVALID' end
+  from dba_registry where comp_id = '$comp';
+exit
+SQL
 }
 
 # ---------------------------------------------------------------------------

@@ -24,6 +24,11 @@
 # Expect roughly 20 minutes per RU pair; the in-database JVM reload is the slow
 # part. Results verified on 2026-08-06 for 23.26.0 -> 23.26.2 and
 # 23.26.1 -> 23.26.2: both detected, both repaired, both fingerprints unchanged.
+# Verified again on 2026-08-31 for 23.26.2 -> 23.26.3 (10 views missing) and
+# 23.26.0 -> 23.26.3 (37 views missing): both reached missing_repairable=0 with
+# jvm_ok=yes and non_valid_components=0, both fingerprints unchanged. That run
+# needed three fixes in repair-ru-dictionary.sh first -- the AWR base tables,
+# the multi-pass convergence, and one session per component revalidation.
 #
 # When a new RU ships, add its new view names to NEW_VIEWS_<RU> in
 # scripts/repair-ru-dictionary.sh first, then run this against the new pair.
