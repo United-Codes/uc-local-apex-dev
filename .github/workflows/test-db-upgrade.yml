@@ -557,7 +557,7 @@ jobs:
           begin
             apex_util.set_workspace(p_workspace => 'INTERNAL');
             dbms_output.put_line('apex_set_workspace=ok');
-            select count(*) into n from apex_appl_pages where rownum <= 1;
+            select count(*) into n from apex_application_pages where rownum <= 1;
             dbms_output.put_line('apex_pages_view_ok=yes');
           end;
           /
