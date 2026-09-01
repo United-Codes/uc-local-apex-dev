@@ -223,7 +223,23 @@ banner "Start the stack"
 # already exists — so ensure the perms here, independent of setup.sh.
 mkdir -p ords-config apex-images
 chmod 777 ords-config apex-images
-$DOCKER_COMPOSE up -d
+# Start ONLY the database here, not the whole stack.
+#
+# ords-26ai has `depends_on: 26ai: condition: service_healthy`, so a plain
+# `up -d` makes compose wait for the database health status before it starts
+# ORDS. On rootless podman that wait can never end: from podman 5.5 or so the
+# health status never leaves "starting" over the Docker-compatible API socket
+# that `podman compose` talks to. It never reports unhealthy either, so compose
+# has no failure to report and simply waits. podman 4.9.3 reported Healthy after
+# 12 seconds; 5.8.4 reports nothing, which hung this script for 90 minutes on
+# "Container local-26ai Waiting" -- before the readiness loop below ever ran.
+#
+# So do the waiting here instead. Step 5 reads the "DATABASE IS READY TO USE"
+# banner out of the log, which works the same on every engine and every version.
+# The remaining services start after it, with --no-deps, so no health gate is
+# consulted. docker behaves exactly as before, and docker-compose.yml keeps its
+# depends_on for anyone who runs `local-26ai.sh start` by hand.
+$DOCKER_COMPOSE up -d 26ai
 
 # ---------------------------------------------------------------------------
 # 5. Wait for the database to be ready
@@ -260,6 +276,12 @@ if [ "$db_ready" != true ]; then
   printf '%s\n' "$db_log" | tail -100 >&2 || true
   fail_resumable "database did not become ready within 25 minutes"
 fi
+
+# Now start the rest of the stack. --no-deps keeps compose from evaluating the
+# service_healthy condition on 26ai (see the note at step 4) -- the database is
+# provably ready at this point, so the gate has nothing left to protect.
+banner "Start the remaining services"
+$DOCKER_COMPOSE up -d --no-deps ords-26ai
 
 # ---------------------------------------------------------------------------
 # 6. Verify the host can reach the database via SQLcl
