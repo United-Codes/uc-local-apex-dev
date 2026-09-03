@@ -202,10 +202,18 @@ jobs:
           set heading off feedback off pagesize 0
           select 'users=' || count(*) from dba_users where username = 'CITEST1';
           select 'ws='    || count(*) from apex_workspaces where workspace = 'CITEST1';
+          -- The per-schema tablespace MUST carry a size ceiling. Without this
+          -- assertion a future edit to create-user.sh silently goes back to
+          -- unbounded autoextend, and CI stays green while one runaway schema
+          -- can push the PDB past the 12 GB Free-edition limit -- after which
+          -- the PDB does not open at all and cannot be repaired from inside.
+          select 'tbs_max=' || maxbytes from dba_data_files
+           where tablespace_name = 'TBS_CITEST1';
           exit
           SQL
           grep -qx 'users=1' create_user.out
           grep -qx 'ws=1'    create_user.out
+          grep -qx 'tbs_max=2147483648' create_user.out
 
           # .env must hold the generated password
           grep -q '^CITEST1_USER_PASSWORD=' .env
@@ -400,6 +408,44 @@ jobs:
           grep -qx 'idx=ADVANCED LOW' compress_space.out
           grep -qx 'def_tab=ENABLED'  compress_space.out
           grep -qx 'def_idx=ENABLED'  compress_space.out
+
+      - name: Test cap-tablespaces.sh and the space defaults
+        run: |
+          set -euo pipefail
+          # shellcheck disable=SC1091
+          source ./scripts/util/load_env.sh
+
+          # A fresh install must already be fully capped by after-first-db-start.sh
+          # and create-user.sh. If any of these fail, an uncapped datafile shipped:
+          # one runaway file can then push the PDB past the 12 GB Free-edition
+          # limit, and a PDB over that limit does not open in ANY mode and cannot
+          # be repaired from inside.
+          ./scripts/cap-tablespaces.sh --summary | tee caps.out
+          grep -qx 'uncapped_files=0'            caps.out
+          grep -qx 'pending_files=0'             caps.out
+          grep -qx 'undo_max_mb=2048'            caps.out
+          grep -qx 'undo_retention=900'          caps.out
+          grep -qx 'undo_guarantee=NOGUARANTEE'  caps.out
+          grep -qx 'audit_max_mb=1024'           caps.out
+          grep -qx 'audit_purge_job=present'     caps.out
+
+          # --check must stay read-only, and re-running --apply must be a no-op.
+          ./scripts/cap-tablespaces.sh --check >/dev/null
+          ./scripts/cap-tablespaces.sh --apply -y | tee caps_apply.out
+          grep -q 'changed 0 datafile ceiling' caps_apply.out
+          ./scripts/cap-tablespaces.sh --summary | grep -qx 'pending_files=0'
+
+          # used-space must report OK on a fresh install, and must report through
+          # the exit code. 0 = OK, 10 = WARNING, 11 = CRITICAL.
+          ./scripts/used-space.sh --summary | tee space.out
+          grep -qx 'status=OK' space.out
+          ./scripts/used-space.sh --quiet
+
+          # Lowering the threshold below the current usage must flip the verdict,
+          # which proves the exit-code contract is wired up and not just printed.
+          rc=0
+          SPACE_CRIT_GB=0.1 ./scripts/used-space.sh --quiet || rc=$?
+          test "$rc" = "11"
 
       - name: Collect logs on failure
         if: failure()

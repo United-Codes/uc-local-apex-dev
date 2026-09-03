@@ -74,6 +74,88 @@ local-26ai.sh used-space
 # TBS_AOP                          77          7         70           91
 ```
 
+The `STATUS` column shows `WARNING` above 9.5GB and `CRITICAL` above 11GB. The
+command also gives the same answer as an exit code, so a script can use it:
+
+| Exit code | Meaning |
+| --------- | ------- |
+| `0` | The used space is below the warning threshold. |
+| `1` | The command failed. For example, it cannot reach the database. |
+| `10` | `WARNING`. The used space is at or above `SPACE_WARN_GB`. |
+| `11` | `CRITICAL`. The used space is at or above `SPACE_CRIT_GB`. |
+
+For a script, use `--summary` for `key=value` lines, or `--quiet` for the exit
+code alone:
+
+```bash
+local-26ai.sh used-space --summary
+
+# current_gb=9.94
+# limit_gb=12
+# pct_of_limit=82.8
+# warn_gb=9.5
+# crit_gb=11
+# status=WARNING
+```
+
+To change the two thresholds, set `SPACE_WARN_GB` and `SPACE_CRIT_GB` in your
+`.env` file. The warning threshold is below the limit on purpose. Every way to
+make a full database smaller needs free space to work in.
+
+The `stop` command runs the same check before it shuts the database down. This is
+the last point at which you can act, because a database that is above the limit
+does not open again.
+
+### Limit the Size of the Datafiles
+
+A datafile with no ceiling can grow until the PDB passes the 12GB limit. The PDB
+then does not open, and you cannot correct it from inside. On one real install the
+undo datafile grew to 3810MB and passed the limit alone. See
+[the recovery steps](/products/uc-local-apex-dev/docs/other/faq/#the-database-does-not-start-and-the-log-shows-ora-12954-what-do-i-do)
+if this already happened to you.
+
+Show the datafiles that have no ceiling:
+
+```bash
+local-26ai.sh cap-tablespaces --check
+```
+
+Give them a ceiling:
+
+```bash
+local-26ai.sh cap-tablespaces --apply
+```
+
+The command sets `MAXSIZE` on each datafile. It never drops an object and it never
+moves data. You can run it again safely, because it skips every datafile that
+already has the correct ceiling. A ceiling that is tighter than the default stays
+as it is.
+
+New installs get these ceilings when the tablespace is created. Run this command
+one time on a database that you created with version 26.3 or earlier.
+
+<Aside type="note">
+A ceiling is not a reservation. The ceilings add up to more than 12GB, and they do
+not keep the total below the limit. A ceiling makes sure that one datafile cannot
+take all the free space without notice. The one schema gets `ORA-01653`, the
+database stays open, and every other schema continues to work.
+</Aside>
+
+`SYSTEM` and `SYSAUX` never get a ceiling. A full `SYSTEM` tablespace is a worse
+failure than the disk space that a ceiling saves. Both tablespaces grow slowly.
+
+If a datafile is already larger than its ceiling, the command uses the current
+size of the file. Run `shrink-space` and then run the command again. The second
+run lowers the ceiling to the default:
+
+```bash
+local-26ai.sh shrink-space
+local-26ai.sh cap-tablespaces --apply
+```
+
+To change the ceiling for new schemas, set `USER_TBS_MAXSIZE` in your `.env` file.
+The default is `2G`.
+
 ### Shrink Database Files
 
 If the tablespaces are larger than the space that they use, shrink them. This command can run for several minutes.
