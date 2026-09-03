@@ -8,7 +8,7 @@ sidebar:
 This page lists the changes of each release. Every entry links to its migration
 guide. The release notes on GitHub hold the pull requests and the contributors.
 
-## 26.4 (not released)
+## 26.4
 
 [Migrate to 26.4](/products/uc-local-apex-dev/docs/migrations/26-4/)
 
@@ -20,17 +20,19 @@ guide. The release notes on GitHub hold the pull requests and the contributors.
 
 ### Data dictionary repair
 
-- New script `scripts/repair-ru-dictionary.sh`. A change of the database image
-  does not upgrade the data dictionary. The script finds the dictionary views
-  that are missing and reloads the catalog scripts that create them. It also
-  reloads the in-database JVM, which the image change breaks in silence.
+- New script `scripts/repair-ru-dictionary.sh`
+  (`local-26ai.sh repair-ru-dictionary`). A change of the database image does not
+  upgrade the data dictionary. The database keeps the dictionary of the release
+  update that created it, and the in-database JVM stops working without a
+  message. The script finds the dictionary views that are missing, reloads the
+  catalog scripts that create them, and reloads the JVM.
 - `--check` shows the gap. `--repair` closes it. `--summary` gives `key=value`
   lines for CI.
-- The repair covers every release update that your database missed. One run is
-  enough.
-- New CI workflow `test-db-upgrade.yml`. It installs the current version, changes
-  the image on the same datafiles, and makes sure that the data and APEX stay
-  unchanged.
+- One run repairs every release update that your database missed, not only the
+  newest one.
+- `test-db-upgrade.yml` now also proves the repair. The workflow changes the
+  image on the same datafiles, runs the repair, and makes sure that the data,
+  APEX and the dictionary are complete after it.
 
 ### Space management
 
@@ -55,23 +57,25 @@ guide. The release notes on GitHub hold the pull requests and the contributors.
 
 ### Podman
 
-- Podman works natively. CI tests Docker and Podman on every push.
-- `install.sh` starts the database first, waits for it, and starts the other
-  services after that. Podman 5.5 and later do not report the container health
-  status, so a plain `compose up -d` never continues.
-- The database healthcheck works under Podman.
-- The project needs the Compose plugin. Support for the old `docker-compose` and
-  `podman-compose` commands is gone.
-- `install.sh` creates the bind-mount directories before it calls `compose up`.
-- The documentation names the Podman socket and the `enable-linger` requirement.
+- The scripts detect the container engine now, so Podman works without changes.
+  Earlier releases documented Podman, but the scripts called `docker` directly.
+  The `CONTAINER_CLI` variable overrides the detected engine.
+- CI installs the project with Docker and with Podman on every push.
+- The project needs the Compose plugin. The old `docker-compose` and
+  `podman-compose` commands are no longer supported.
+- `install.sh` starts the database first and waits for it before it starts ORDS.
+  Podman 5.5 and later do not report the container health status, so one
+  `compose up -d` for the whole stack never continues.
+- The Podman guide names the API socket and the `enable-linger` requirement.
 
 ### Secure mode
 
 - New flag `install.sh --secure`. It sets `SECURE_MODE=true` in `.env`.
 - Secure installs get bounded APEX session timeouts: 18 hours maximum length and
   8 hours maximum idle. Local installs keep the 7-day developer default.
-- The ORDS debug flag is now `DEBUG_TO_SCREEN`. The old name collided with a
-  variable of the ORDS image and stopped the container.
+- New variable `DEBUG_TO_SCREEN` in `.env` controls the debug output of ORDS.
+  Release 26.3 passed `DEBUG` to the container, and that name collides with a
+  variable of the ORDS image and stops it.
 
 ### APEX parameters
 
@@ -88,8 +92,11 @@ guide. The release notes on GitHub hold the pull requests and the contributors.
 
 ### Other scripts
 
-- A new user gets the `create assertion` privilege.
-- The passwords of the database accounts do not expire.
+- A new user gets the `create assertion` privilege, so the assertions of 23.26.1
+  are usable.
+- `after-first-db-start.sh` stops the passwords of the database accounts from
+  expiring. `disable-password-expiration.sh` and `unexpire-accounts.sh` cover
+  more accounts.
 - `install-dbms-cloud.sh` completes the steps after the wallet.
 
 ### Documentation

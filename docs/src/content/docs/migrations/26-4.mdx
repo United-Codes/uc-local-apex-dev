@@ -7,10 +7,6 @@ sidebar:
 
 import { Aside } from "@astrojs/starlight/components";
 
-<Aside type="caution" title="Not yet released">
-  Work in progress
-</Aside>
-
 If you haven't installed uc-local-apex-dev yet, you can find the [setup instructions here](/products/uc-local-apex-dev/docs/getting-started/).
 
 **Make sure you are on 26.3 before you start. Do the previous migrations if not.**
@@ -19,16 +15,14 @@ If you haven't installed uc-local-apex-dev yet, you can find the [setup instruct
 
 - DB 23.26.2.0 → 23.26.3.0. The datafiles are compatible. No dump and restore is necessary. The data dictionary does not upgrade automatically. See [Upgrade the data dictionary](#upgrade-the-data-dictionary).
 - ORDS 26.1.2 → 26.2.2. ORDS upgrades its own schema on the first start. No action is necessary.
-- `install.sh` now starts the database on its own, waits for it, and starts the other services after that. A plain `compose up -d` waits for the health status of the database container. Podman 5.5 and later do not report that status, so the installation stopped and never continued. Docker is not affected. See the [FAQ](/products/uc-local-apex-dev/docs/other/faq/).
-- `repair-ru-dictionary.sh` corrections:
-  - The AWR views (`DBA_HIST_*`) are repairable now. The script reloads the base tables of AWR before the views. The old code created a synonym over a view that did not exist, and every query on it gave `ORA-01775`.
-  - The probe list gains the four `23.26.2` views that Oracle documents. It also gains `DBA_HIST_DATA_MEMORY_AREA`, which the Oracle documentation does not name.
-  - One `--repair` run is now enough for a database that missed more than one release update. The script repeats the catalog scripts while the number of missing views goes down.
-  - The component revalidation uses one session for each component. The old code used one session for all of them, and `VALIDATE_APEX` therefore left APEX `INVALID` on an install that has APEX.
+- New script `scripts/repair-ru-dictionary.sh` (`local-26ai.sh repair-ru-dictionary`). A change of the database image does not upgrade the data dictionary, and it also stops the in-database JVM without a message. The script repairs both. This migration needs it one time. One run also repairs the release updates that earlier image changes missed. See [Upgrade the data dictionary](#upgrade-the-data-dictionary).
+- The scripts detect the container engine now, so Podman works without changes. `CONTAINER_CLI` overrides the detected engine, and CI installs the project with both engines. Release 26.3 documented Podman, but the scripts called `docker` directly.
+- The project needs the Compose plugin (`docker compose`). The old `docker-compose` and `podman-compose` commands are no longer supported.
+- `install.sh` starts the database first and waits for it before it starts ORDS. Podman 5.5 and later do not report the container health status, so one `compose up -d` for the whole stack never continues. Docker is not affected. See the [FAQ](/products/uc-local-apex-dev/docs/other/faq/).
 - APEX instance & workspace parameter handling reworked (`scripts/upgrade-apex.sh`, `scripts/util/get_ws_settings.sh`)
   - Parameters that APEX resolves at runtime (`MAX_SESSION_IDLE_SEC`, `MAX_SESSION_LENGTH_SEC`, `ACCOUNT_LIFETIME_DAYS`, `MAX_WEBSERVICE_REQUESTS`) are now set **once at the instance level** instead of being repeated for every workspace. Any workspace without its own override inherits the instance value.
   - `get_ws_settings.sh` now sets only the two parameters that genuinely need a per-workspace value: `ALLOW_HOSTING_EXTENSIONS` (a NOT NULL per-workspace column that does not inherit) and `WORKSPACE_EMAIL_MAXIMUM` (no instance-level equivalent).
-  - Secure installs (`SECURE_MODE=true`, i.e. `install.sh --secure`) now get **bounded session timeouts — 18h max length / 8h max idle** — instead of the 7-day developer default. Local (non-secure) installs are unchanged and keep the long 7-day sessions for convenience.
+  - Secure installs (`SECURE_MODE=true`, that is `install.sh --secure`) now get **bounded session timeouts — 18h max length / 8h max idle** — instead of the 7-day developer default. Local (non-secure) installs are unchanged and keep the long 7-day sessions for convenience.
 - Every datafile now gets a size ceiling, so one datafile cannot fill the 12GB limit of the Free edition alone. A PDB that passes the limit does not open, and you cannot correct it from inside. Existing installs need one command. See [Cap the tablespaces](#cap-the-tablespaces).
   - New script `scripts/cap-tablespaces.sh` (`local-26ai.sh cap-tablespaces`): `--check` reports the datafiles without a ceiling, `--apply` gives them one, and `--summary` gives `key=value` lines.
   - `create-user.sh` now sets `MAXSIZE` on the tablespace of the new schema. The default is `2G`, and `USER_TBS_MAXSIZE` in `.env` changes it.
@@ -160,9 +154,41 @@ alter package "OWNER"."PACKAGE_NAME" compile body;
 
 ### Optional: apply the new session limits to existing workspaces
 
-The new instance-level session settings only take effect for workspaces that do **not** already carry their own override. Workspaces created by earlier versions of `create-user.sh` still have explicit per-workspace values (`604800`), so they keep the old 7-day timeout until you clear those overrides.
+Your workspaces carry their own session values, so they keep the 7-day timeout.
+This step makes them use the instance values. It matters most for a secure
+install, which limits a session to 18 hours and an idle session to 8 hours.
 
-This mainly matters for **secure installs** where you want existing workspaces to pick up the tighter 18h/8h limits. Connect as `SYS` and clear the overrides so the workspaces inherit the instance value:
+Connect as `SYS` and do the two steps in this order. If you clear the workspace
+values first, the workspaces get the old values.
+
+Step 1: set the instance values. Use the block for your install:
+
+```sql
+-- secure install (install.sh --secure): 18h maximum length, 8h maximum idle
+begin
+  apex_instance_admin.set_parameter('MAX_SESSION_LENGTH_SEC',  64800);
+  apex_instance_admin.set_parameter('MAX_SESSION_IDLE_SEC',    28800);
+  apex_instance_admin.set_parameter('ACCOUNT_LIFETIME_DAYS',   9999);
+  apex_instance_admin.set_parameter('MAX_WEBSERVICE_REQUESTS', 100000);
+  commit;
+end;
+/
+```
+
+```sql
+-- local install: 7 days for both timeouts
+begin
+  apex_instance_admin.set_parameter('MAX_SESSION_LENGTH_SEC',  604800);
+  apex_instance_admin.set_parameter('MAX_SESSION_IDLE_SEC',    604800);
+  apex_instance_admin.set_parameter('ACCOUNT_LIFETIME_DAYS',   9999);
+  apex_instance_admin.set_parameter('MAX_WEBSERVICE_REQUESTS', 100000);
+  commit;
+end;
+/
+```
+
+Step 2: clear the workspace values, so that the workspaces use the instance
+values:
 
 ```sql
 begin
@@ -177,7 +203,8 @@ end;
 /
 ```
 
-`ALLOW_HOSTING_EXTENSIONS` is intentionally left out — it is a NOT NULL per-workspace column and cannot be cleared to inherit.
+`ALLOW_HOSTING_EXTENSIONS` stays a workspace value. It is a NOT NULL column, and
+it cannot use the instance value.
 
 ### Cap the tablespaces
 

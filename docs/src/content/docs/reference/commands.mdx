@@ -64,7 +64,8 @@ See [Install Apps or Scripts](/products/uc-local-apex-dev/docs/getting-started/i
 
 | Command | Description |
 | ------- | ----------- |
-| `used-space` | Show the used database space per tablespace, against the 12GB limit of the Free edition. |
+| `used-space` | Show the used database space per tablespace, against the 12GB limit of the Free edition. `--summary` gives `key=value` lines, and `--quiet` gives the exit code alone. The exit code is `0` for OK, `10` for `WARNING`, and `11` for `CRITICAL`. |
+| `cap-tablespaces` | Give every datafile a size ceiling, so one datafile cannot fill the 12GB limit alone. `--check` reports and changes nothing. `--apply` sets the ceilings. `-y` skips the confirmation. |
 | `shrink-space` | Shrink tablespaces and datafiles to reclaim unused space. |
 | `compress-space <name>` | Enable Advanced Compression on the tablespace of a schema, rebuild its objects in compressed form, and return the free space to the operating system. `-y` skips the confirmation. |
 
@@ -76,6 +77,7 @@ See [Common Tasks → Maintenance Tasks](/products/uc-local-apex-dev/docs/gettin
 | ------- | ----------- |
 | `after-first-db-start` | Install APEX and apply the defaults for development. `install.sh` runs this command. You need it only for a manual installation. |
 | `upgrade-apex` | Download the latest APEX version, run the installer, copy the images, and set the workspace settings again. |
+| `repair-ru-dictionary` | Repair the data dictionary after a change of the database image. A new release update adds dictionary views and a new in-database JVM, and the image change does not install them. `--check` reports and changes nothing. `--repair` applies the repair. `--summary` gives `key=value` lines. |
 | `unexpire-accounts` | Unlock the APEX and ORDS accounts. This corrects an "Account Is Locked" message. |
 | `disable-password-expiration` | Stop the passwords of database accounts from expiring. |
 | `disable-archive-logs` | Disable archive logging to save disk space. Archive logs are not necessary in development. |
