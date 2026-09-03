@@ -84,6 +84,19 @@ if [ "$compress" = true ]; then
 "
 fi
 
+# Ceiling for the new tablespace. The Free edition allows 12 GB of datafiles per
+# PDB, and a PDB that goes over the limit will not open again in ANY mode --
+# ORA-12954 is raised before the open, so it cannot be repaired from inside.
+#
+# This is a ceiling, not a reservation. It does not keep the total under 12 GB
+# (use `local-26ai.sh used-space` for that). What it guarantees is that one
+# runaway schema cannot silently absorb all the remaining headroom: it hits
+# ORA-01653 on its own tablespace instead, and every other schema keeps working.
+#
+# Note that `grant unlimited tablespace` below makes a per-user quota
+# unenforceable, so this maxsize is the only working per-schema limit.
+USER_TBS_MAXSIZE="${USER_TBS_MAXSIZE:-2G}"
+
 # if user exists in .env file
 if user_in_env_bool "$USERNAME"; then
 
@@ -113,7 +126,8 @@ sql -name "$DB_CONN_NAME" <<SQL
     datafile 'tbs_${USERNAME_LOWER}.dat'
       size 10M
       reuse
-      autoextend on next 2M;
+      autoextend on next 2M
+      maxsize ${USER_TBS_MAXSIZE};
 ${COMPRESS_DEFAULTS}
   create user ${USERNAME}
     identified by "${USER_PASSWORD}"

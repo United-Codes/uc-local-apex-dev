@@ -5,6 +5,14 @@ description: A new Oracle Database version is released. It should work with the 
 
 ## New Oracle Database version released
 
+**First, check that the release is adoptable at all.** Changing the image tag on
+an existing `oradata` volume does not upgrade the data dictionary, and neither
+`datapatch` nor `catupgrd` corrects it. Run the `db-ru-dictionary-check` skill
+(`.agents/skills/db-ru-dictionary-check/SKILL.md`) before anything below. It
+tells you whether an in-place swap plus `scripts/repair-ru-dictionary.sh` is
+safe, or whether this release needs a Data Pump migration instead. Its outcome
+decides what the migration guide has to say.
+
 Use `gh run list --workflow=test-db-upgrade.yml` to check if a recent successful run of the `test-db-upgrade.yml` workflow exists. If not, ask the user if they want to trigger a new run with the new database version. First verify that such a version exists on the repo.
 
 ## Upgrade DB locally

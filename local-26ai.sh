@@ -29,10 +29,10 @@ print_help() {
   for cmd in test-app-install test-script-install; do print_command "$cmd"; done
   echo
   echo "Disk Space:"
-  for cmd in used-space shrink-space compress-space; do print_command "$cmd"; done
+  for cmd in used-space shrink-space compress-space cap-tablespaces; do print_command "$cmd"; done
   echo
   echo "Setup & Maintenance:"
-  for cmd in after-first-db-start upgrade-apex unexpire-accounts disable-password-expiration disable-archive-logs create-self-signed-certificates install-dbms-cloud; do print_command "$cmd"; done
+  for cmd in after-first-db-start upgrade-apex repair-ru-dictionary unexpire-accounts disable-password-expiration disable-archive-logs create-self-signed-certificates install-dbms-cloud; do print_command "$cmd"; done
   echo
   echo "Docs: https://www.united-codes.com/products/uc-local-apex-dev/docs/"
 }

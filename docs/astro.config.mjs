@@ -83,7 +83,7 @@ export default defineConfig({
 				},
 				{
 					label: "Other",
-					items: ["other/faq"],
+					items: ["other/faq", "other/changelog"],
 				},
 			],
 			customCss: ["./src/styles/uc.css"],

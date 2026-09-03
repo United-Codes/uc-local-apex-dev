@@ -5,20 +5,36 @@ set -e
 
 source ./scripts/util/load_env.sh
 
-# The AUDIT_TRAIL datafile can autoextend to several GB during a burst of audit
-# activity and never shrink back. Two independent levers reclaim that space:
-#   1. Purge old audit records (deletes audit history; optional, below).
+# The AUDIT_TRAIL datafile grows to several GB and never shrinks back. The cost is
+# structural, not a burst of activity: AUD$UNIFIED is interval-partitioned by DAY
+# and every partition segment takes an 8 MB initial extent, so one day costs
+# 1 table partition + 4 LOB partitions = ~41 MB almost regardless of how many
+# records that day produced. Measured: 41 partitions holding 1716 rows used
+# 1693 MB. Two independent levers reclaim that space:
+#   1. Purge old audit records (drops whole partitions; optional, below).
 #   2. Shrink the tablespace (compacts segments + resizes the datafile down).
 #
 # dbms_space.shrink_tablespace can relocate the internal AUD$UNIFIED partitions
 # that ALTER TABLE / DROP TABLESPACE cannot touch from inside a PDB (those raise
 # ORA-65040), so a plain shrink is the reliable, non-destructive fix.
 
-# Optional Tier 1: purge audit records. after-first-db-start.sh marks records
-# archivable via set_last_archive_timestamp but never calls clean_audit_trail,
-# so they accumulate. Each type is purged in its own block with an exception
-# handler so a type that needs init_cleanup (or has nothing to purge) does not
-# abort the rest.
+# Optional Tier 1: purge audit records.
+#
+# What frees space here is dropping whole partitions, which clean_audit_trail does
+# when every row in a partition predates the last archive timestamp. Deleting rows
+# reclaims almost nothing on its own, because the freed SecureFile LOB space stays
+# inside its segment.
+#
+# Since 26.4, after-first-db-start.sh installs a UC_AUDIT_PURGE scheduler job that
+# does this nightly on a rolling 7-day window, so on a current install there is
+# usually little left to purge. Databases created before that never purged at all
+# (the old code only marked records archivable and never called
+# clean_audit_trail), so the first run here can free gigabytes.
+#
+# Each type is purged in its own block with an exception handler so a type with
+# nothing to purge does not abort the rest. Note the unified trail needs no
+# cleanup initialisation: dbms_audit_mgmt.init_cleanup carries pragma deprecate,
+# and is_cleanup_initialized raises ORA-46259 for UNIFIED_AUDIT_TRAIL.
 if [ -t 0 ]; then
   read -r -p "Purge audit records first (deletes audit history, frees audit data)? [Y/n] " purge_ans
 else
