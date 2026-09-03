@@ -127,9 +127,10 @@ The output must contain `missing_repairable=0`, `jvm_ok=yes` and
 `non_valid_components=0`.
 
 <Aside type="note">
-The repair corrects every release update that your database missed, not only
-23.26.3. One database that started on 23.26.0 reported 13 missing views, because
-earlier image changes left their own gaps. One `--repair` run closed all of them.
+  The repair corrects every release update that your database missed, not only
+  23.26.3. One database that started on 23.26.0 reported 13 missing views,
+  because earlier image changes left their own gaps. One `--repair` run closed
+  all of them.
 </Aside>
 
 The `dictionary_ru` line in the output keeps the name of the old release update.
@@ -245,10 +246,11 @@ size of the file and reports it. Reclaim the space and then lower the ceiling:
 ```
 
 <Aside type="note">
-This release also adds the `UC_AUDIT_PURGE` job for new installs. Your database
-does not get the job, because `after-first-db-start.sh` does not run again on an
-installed database. `shrink-space` purges the audit records for you, and the
-command above tells you to run it. On one install this step alone freed 1.4GB.
+  This release also adds the `UC_AUDIT_PURGE` job for new installs. Your
+  database does not get the job, because `after-first-db-start.sh` does not run
+  again on an installed database. `shrink-space` purges the audit records for
+  you, and the command above tells you to run it. On one install this step alone
+  freed 1.4GB.
 </Aside>
 
 ### Verify
@@ -270,7 +272,10 @@ Delete the images of the old release only after APEX answers. They are the way
 back if you must return to 26.3.
 
 ```sh
+# Check which versions you still have:
 docker image ls
+
+# And remove them like this:
 docker image rm container-registry.oracle.com/database/free:23.26.2.0
 docker image rm container-registry.oracle.com/database/ords:26.1.2
 ```
