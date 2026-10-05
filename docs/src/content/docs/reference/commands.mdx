@@ -83,5 +83,6 @@ See [Common Tasks → Maintenance Tasks](/products/uc-local-apex-dev/docs/gettin
 | `disable-archive-logs` | Disable archive logging to save disk space. Archive logs are not necessary in development. |
 | `create-self-signed-certificates` | Create self-signed SSL certificates so ORDS serves HTTPS on port 8443. Run with `sudo`. |
 | `install-dbms-cloud` | Install the `DBMS_CLOUD` package into the database. |
+| `upgrade-dbms-cloud` | Reload the `DBMS_CLOUD` packages after a change of the database image. The command stops with an error if `DBMS_CLOUD` is not installed. It does not change the wallet, and it does not restart the database. |
 
 See [Upgrade APEX](/products/uc-local-apex-dev/docs/migrations/upgrade-apex/) and [Common Tasks](/products/uc-local-apex-dev/docs/getting-started/common-tasks/).

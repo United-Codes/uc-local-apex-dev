@@ -18,6 +18,12 @@ guide. The release notes on GitHub hold the pull requests and the contributors.
   is necessary. The data dictionary needs one repair command.
 - ORDS 26.1.2 → 26.2.2. ORDS upgrades its own schema on the first start.
 
+### DBMS_CLOUD upgrade
+
+- New script `scripts/upgrade-dbms-cloud.sh` (`local-26ai.sh upgrade-dbms-cloud`).
+  A change of the database image does not upgrade `DBMS_CLOUD`. The script
+  reloads the packages. It stops with an error if `DBMS_CLOUD` is not installed.
+
 ### Data dictionary repair
 
 - New script `scripts/repair-ru-dictionary.sh`

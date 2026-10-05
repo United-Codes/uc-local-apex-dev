@@ -16,6 +16,7 @@ If you haven't installed uc-local-apex-dev yet, you can find the [setup instruct
 - DB 23.26.2.0 → 23.26.3.0. The datafiles are compatible. No dump and restore is necessary. The data dictionary does not upgrade automatically. See [Upgrade the data dictionary](#upgrade-the-data-dictionary).
 - ORDS 26.1.2 → 26.2.2. ORDS upgrades its own schema on the first start. No action is necessary.
 - New script `scripts/repair-ru-dictionary.sh` (`local-26ai.sh repair-ru-dictionary`). A change of the database image does not upgrade the data dictionary, and it also stops the in-database JVM without a message. The script repairs both. This migration needs it one time. One run also repairs the release updates that earlier image changes missed. See [Upgrade the data dictionary](#upgrade-the-data-dictionary).
+- New script `scripts/upgrade-dbms-cloud.sh` (`local-26ai.sh upgrade-dbms-cloud`). A change of the database image does not upgrade `DBMS_CLOUD`. The packages keep the code of the release update that installed them. If you installed `DBMS_CLOUD`, this migration needs the script one time. See [Upgrade DBMS_CLOUD](#upgrade-dbms_cloud).
 - The scripts detect the container engine now, so Podman works without changes. `CONTAINER_CLI` overrides the detected engine, and CI installs the project with both engines. Release 26.3 documented Podman, but the scripts called `docker` directly.
 - The project needs the Compose plugin (`docker compose`). The old `docker-compose` and `podman-compose` commands are no longer supported.
 - `install.sh` starts the database first and waits for it before it starts ORDS. Podman 5.5 and later do not report the container health status, so one `compose up -d` for the whole stack never continues. Docker is not affected. See the [FAQ](/products/uc-local-apex-dev/docs/other/faq/).
@@ -152,6 +153,24 @@ If a package body stays `INVALID`, compile it directly:
 ```sql
 alter package "OWNER"."PACKAGE_NAME" compile body;
 ```
+
+### Upgrade DBMS_CLOUD
+
+If you never ran `install-dbms-cloud`, skip this section. The script stops with
+an error when `DBMS_CLOUD` is not installed.
+
+The image change does not upgrade `DBMS_CLOUD`. The packages keep the code of the
+release update that installed them. The new image ships newer code.
+
+Reload the packages:
+
+```sh
+./local-26ai.sh upgrade-dbms-cloud
+```
+
+The script runs the install scripts of Oracle again in the CDB root and in the
+PDBs. It does not change the wallet or the network ACLs, and it does not restart
+the database. You can run it again at any time.
 
 ### Optional: apply the new session limits to existing workspaces
 
