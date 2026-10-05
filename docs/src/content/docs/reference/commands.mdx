@@ -79,6 +79,7 @@ See [Common Tasks → Maintenance Tasks](/products/uc-local-apex-dev/docs/gettin
 | `upgrade-apex` | Download the latest APEX version, run the installer, copy the images, and set the workspace settings again. |
 | `repair-ru-dictionary` | Repair the data dictionary after a change of the database image. A new release update adds dictionary views and a new in-database JVM, and the image change does not install them. `--check` reports and changes nothing. `--repair` applies the repair. `--summary` gives `key=value` lines. |
 | `unexpire-accounts` | Unlock the APEX and ORDS accounts. This corrects an "Account Is Locked" message. |
+| `set-open-cursors [value]` | Raise the `open_cursors` setting of the database. The default of the Free image is too low for the APEX import of a large application, which then fails with `ORA-01000`. The default value is `1000`. The command raises the setting only, and never lowers it. `install.sh` runs this command. |
 | `disable-password-expiration` | Stop the passwords of database accounts from expiring. |
 | `disable-archive-logs` | Disable archive logging to save disk space. Archive logs are not necessary in development. |
 | `create-self-signed-certificates` | Create self-signed SSL certificates so ORDS serves HTTPS on port 8443. Run with `sudo`. |

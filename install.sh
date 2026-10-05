@@ -352,6 +352,24 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# 7b. Raise open_cursors for large APEX imports
+# ---------------------------------------------------------------------------
+# The Free image gives FREEPDB1 open_cursors=300, which is a handful of cursors
+# below what the SQLcl APEXlang importer needs for a mid-size application. The
+# result is an `apex import` that fails at random with ORA-01000, and the error
+# names the application instead of the setting. See the script header for the
+# measurements.
+#
+# This runs on EVERY install, not only a fresh one: step 7 is skipped once APEX
+# exists, and an installation made before this step still carries the old 300.
+# The script raises the value only when the current value is lower, so a re-run
+# and a hand-raised ceiling both stay untouched. The change is immediate, so it
+# needs no restart. It must stay after step 7, which saves the SYS connection
+# that the script uses.
+banner "Raise open_cursors for APEX imports"
+./scripts/set-open-cursors.sh
+
+# ---------------------------------------------------------------------------
 # 8. Wait for ORDS to finish its first-boot install
 # ---------------------------------------------------------------------------
 banner "Wait for ORDS to be ready (up to 15 minutes)"
