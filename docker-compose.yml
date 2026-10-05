@@ -45,10 +45,14 @@ services:
       # it off; defaults on for dev. NB: do not name the .env key ORDS_DEBUG --
       # that is reserved inside the ORDS launcher (JVM -agentlib:jdwp options).
       - DEBUG=${DEBUG_TO_SCREEN:-true}
+      # ORDS 26.2.3+ refuses to install or upgrade without ORACLE_USER_PWD (it
+      # becomes the ORDS_PUBLIC_USER password). Fall back to ORACLE_PWD so older
+      # .env files keep working without a migration step.
+      - ORACLE_USER_PWD=${ORACLE_USER_PWD:-${ORACLE_PWD}}
     depends_on:
       26ai:
         condition: service_healthy
-    image: container-registry.oracle.com/database/ords:26.2.2
+    image: container-registry.oracle.com/database/ords:26.2.3
     container_name: local-26ai-ords
 
 networks:
