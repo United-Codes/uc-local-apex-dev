@@ -46,6 +46,18 @@ Otherwise start the database:
 ./local-26ai.sh start
 ```
 
+### Reclaim space
+
+The new image and the APEX upgrade need free space. The Free edition limits the PDB to 12GB.
+
+Run `shrink-space` before you start the migration:
+
+```sh
+./local-26ai.sh shrink-space
+```
+
+The command reclaims unused space in the tablespaces. It also purges old audit records. This command can run for several minutes.
+
 ### Backup the database
 
 This will backup all schemas and APEX workspaces that were created with the `local-26ai.sh create-user` script. If you have additional schemas or workspaces **you need to back them up manually**.
