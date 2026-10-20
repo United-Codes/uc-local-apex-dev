@@ -68,8 +68,13 @@ begin
     audit_trail_type        => dbms_audit_mgmt.audit_trail_aud_std,
     use_last_arch_timestamp => true);
   dbms_output.put_line('aud_std purge done');
-exception when others then
-  dbms_output.put_line('aud_std purge skipped: '||sqlerrm);
+exception
+  when others then
+    if sqlcode = -46258 then
+      dbms_output.put_line('aud_std: nothing to purge (legacy trail not in use)');
+    else
+      dbms_output.put_line('aud_std purge skipped: '||sqlerrm);
+    end if;
 end;
 /
 
@@ -81,8 +86,13 @@ begin
     audit_trail_type        => dbms_audit_mgmt.audit_trail_fga_std,
     use_last_arch_timestamp => true);
   dbms_output.put_line('fga_std purge done');
-exception when others then
-  dbms_output.put_line('fga_std purge skipped: '||sqlerrm);
+exception
+  when others then
+    if sqlcode = -46258 then
+      dbms_output.put_line('fga_std: nothing to purge (legacy trail not in use)');
+    else
+      dbms_output.put_line('fga_std purge skipped: '||sqlerrm);
+    end if;
 end;
 /
 SQL
