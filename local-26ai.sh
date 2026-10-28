@@ -48,6 +48,21 @@ fi
 # Remove the first argument, shifting all other arguments left
 shift
 
+# Command aliases
+case "$script_name" in
+  reclaim-space) script_name="shrink-space" ;;
+  backup) script_name="backup-all" ;;
+  restore) script_name="import-backup" ;;
+  disk-space|space) script_name="used-space" ;;
+  upgrade-db-dictionary) script_name="repair-ru-dictionary" ;;
+  restart)
+    cd "$SCRIPT_DIR"
+    ./scripts/stop.sh "$@"
+    ./scripts/start.sh "$@"
+    exit 0
+    ;;
+esac
+
 export ORIGINAL_PWD="$PWD"
 
 # Check if script exists
