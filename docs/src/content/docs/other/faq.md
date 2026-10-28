@@ -248,3 +248,41 @@ podman compose up -d --no-deps ords-26ai
 
 `--no-deps` stops compose from reading the health status. The database is already
 open at this point, so the health gate has no more purpose.
+
+## The installation fails with "database did not become ready within 25 minutes". What do I do?
+
+The install script waits up to 25 minutes for the first boot of the database. The log shows `Database is not ready yet` and the wait grows to 64 seconds. Then the script stops with this error:
+
+```
+ERROR: database did not become ready within 25 minutes
+```
+
+The first boot can hang. The log shows that the listener and the instance started, but the line `DATABASE IS READY TO USE` never appears. The cause is not known. A new first boot from a clean state corrected the failure for one user.
+
+CAUTION: Do not use these commands on an installation that has data. The `volume rm` command deletes the database and all data in it.
+
+1. Stop the containers:
+
+   ```sh
+   docker compose down        # or: podman compose down
+   ```
+
+2. Delete the database volume:
+
+   ```sh
+   docker volume rm oradata-26ai   # or: podman volume rm oradata-26ai
+   ```
+
+3. Delete the `.env` file. The install script creates a new one:
+
+   ```sh
+   rm .env
+   ```
+
+4. Run the installation again:
+
+   ```sh
+   ./install.sh
+   ```
+
+If the failure comes back, read the database log with `docker compose logs 26ai`. Then open an issue in the [GitHub repository](https://github.com/United-Codes/uc-local-apex-dev) and attach the log.
