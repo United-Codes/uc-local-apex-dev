@@ -44,7 +44,7 @@ See [Creating Users](/products/uc-local-apex-dev/docs/getting-started/creating-u
 | `backup-all` | Export every schema with DataPump to `./backups/export`, with the APEX workspaces, applications, and ORDS modules. |
 | `backup-user <name>` | Export a single schema with DataPump, with its APEX workspace and applications. |
 | `import-backup <name>` | Restore a schema from a backup. If the user does not exist, the script creates it first. |
-| `import-datapump <name> [-rs <target>]` | Import a DataPump dump for a schema. With `-rs` the script imports the dump into a different schema name. |
+| `import-datapump <name> [-rs <target>] [-rt <old>=<new>]` | Import a DataPump dump for a schema. With `-rs` the script imports the dump into a different schema name. With `-rt` the script puts the tables of a dump tablespace into a local tablespace. |
 | `import-all` | Import every export file in `./backups/import`. Use it during a migration. |
 | `sync-backups-folder` | Copy `./backups/import` into the DataPump directory of the container, and copy new exports back out. |
 | `fix-ws-group-ids` | Delete the group IDs from the APEX workspace export files in `./backups/import`, so the files import correctly. |

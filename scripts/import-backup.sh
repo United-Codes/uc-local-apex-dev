@@ -8,7 +8,7 @@ source ./scripts/util/user_in_env.sh
 source ./scripts/util/user-exists-in-db.sh
 
 if [ -z "$1" ]; then
-  echo "Usage: $0 <schema_name> [-rs <remap_schema_name>] [-y]"
+  echo "Usage: $0 <schema_name> [-rs <remap_schema_name>] [-rt <old_tbs>=<new_tbs>[,...]] [-y]"
   exit 1
 fi
 USERNAME=$1
@@ -16,7 +16,9 @@ USERNAME_UPPER=$(echo "$USERNAME" | tr '[:lower:]' '[:upper:]')
 USERNAME_LOWER=$(echo "$USERNAME" | tr '[:upper:]' '[:lower:]')
 
 # Parse optional parameters
-REMAP_ARGS=""
+# An array, so that each flag and its value reach import-datapump.sh as separate
+# arguments. A single quoted string arrived as one word and the remap was lost.
+REMAP_ARGS=()
 SKIP_CONFIRMATION=false
 shift # Remove first argument (USERNAME)
 
@@ -24,10 +26,19 @@ while [[ $# -gt 0 ]]; do
   case $1 in
     -rs)
       if [ -n "$2" ]; then
-        REMAP_ARGS="-rs $2"
+        REMAP_ARGS+=(-rs "$2")
         shift 2
       else
         echo "Error: -rs requires a schema name"
+        exit 1
+      fi
+      ;;
+    -rt)
+      if [ -n "$2" ]; then
+        REMAP_ARGS+=(-rt "$2")
+        shift 2
+      else
+        echo "Error: -rt requires <old_tbs>=<new_tbs>"
         exit 1
       fi
       ;;
@@ -101,7 +112,7 @@ echo "Importing $USERNAME_UPPER"
 # check if .dmp file exists in backups/import
 if [ -f ./backups/import/"$USERNAME_LOWER".dmp ]; then
   echo "Importing datapump from ./backups/import/$USERNAME_LOWER.dmp"
-  ./scripts/import-datapump.sh "$USERNAME_UPPER" "$REMAP_ARGS"
+  ./scripts/import-datapump.sh "$USERNAME_UPPER" "${REMAP_ARGS[@]}"
 else
   echo "No .dmp file found at ./backups/import/$USERNAME_LOWER.dmp"
 fi
