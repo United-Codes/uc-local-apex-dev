@@ -59,6 +59,23 @@ first.
   fix-ws-group-ids` before the import.
 </Aside>
 
+### Import a Dump from Another Database
+
+A dump from another database, for example a production export, keeps the
+tablespace names of that database. If a tablespace does not exist here, every
+table fails with `ORA-00959`. The job still reports `COMPLETED`.
+
+Each schema of this environment has its own tablespace with the name
+`TBS_<NAME>`. Remap the tablespaces of the dump to that tablespace with `-rt`:
+
+```bash
+local-26ai.sh import-datapump uc -rt UC=TBS_UC
+```
+
+If the dump uses more than one tablespace, separate the pairs with a comma:
+`-rt UC=TBS_UC,UC_IDX=TBS_UC`. The `import-backup` command accepts the same
+`-rt` flag.
+
 ### Import All Users
 
 Restore every export file in the `./backups/import` directory:

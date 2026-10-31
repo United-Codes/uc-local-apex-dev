@@ -1,33 +1,63 @@
 #!/usr/bin/env bash
-# desc: Import a DataPump dump for a schema (-rs remaps to a different schema name)
+# desc: Import a DataPump dump for a schema (-rs remaps the schema, -rt the tablespaces)
 
 set -e
 
 source ./scripts/util/load_env.sh
 
+usage() {
+  echo "Usage: $0 <schema_name> [-rs <remap_schema_name>] [-rt <old_tbs>=<new_tbs>[,...]]"
+  exit 1
+}
+
 # check parameter is passed
 if [ -z "$1" ]; then
-  echo "Usage: $0 <schema_name> [-rs <remap_schema_name>]"
-  exit 1
+  usage
 fi
 
 USERNAME=$1
 USERNAME_LOWER=$(echo "$USERNAME" | tr '[:upper:]' '[:lower:]')
 SQLCRED_NAME="${DB_CONN_BASE}-${USERNAME_LOWER}"
+shift
 
-# Parse optional -rs parameter
+# Parse optional parameters
 REMAP_SCHEMA=""
+REMAP_TABLESPACES=""
 SCHEMA_NAME="${USERNAME_LOWER}"
-if [ "$2" = "-rs" ] && [ -n "$3" ]; then
-  REMAP_SCHEMA_NAME=$(echo "$3" | tr '[:upper:]' '[:lower:]')
-  # -objectid FALSE only when remapping. DataPump replays the exported OID of an
-  # object TYPE, which the target database already holds under the old schema,
-  # so the type fails with ORA-02304 / ORA-39083 and every dependent object goes
-  # with it. A new OID is fine for a restore. Leave the default alone for a
-  # same-name restore so that path stays byte-identical to before.
-  REMAP_SCHEMA="-remapschemas ${REMAP_SCHEMA_NAME}=${USERNAME_LOWER} -objectid FALSE"
-  SCHEMA_NAME="${REMAP_SCHEMA_NAME}"
-fi
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -rs)
+      [ -n "$2" ] || usage
+      REMAP_SCHEMA_NAME=$(echo "$2" | tr '[:upper:]' '[:lower:]')
+      # -objectid FALSE only when remapping. DataPump replays the exported OID of an
+      # object TYPE, which the target database already holds under the old schema,
+      # so the type fails with ORA-02304 / ORA-39083 and every dependent object goes
+      # with it. A new OID is fine for a restore. Leave the default alone for a
+      # same-name restore so that path stays byte-identical to before.
+      REMAP_SCHEMA="-remapschemas ${REMAP_SCHEMA_NAME}=${USERNAME_LOWER} -objectid FALSE"
+      SCHEMA_NAME="${REMAP_SCHEMA_NAME}"
+      shift 2
+      ;;
+    -rt)
+      # A dump from another database (a production export, for example) keeps
+      # its tables in tablespaces that do not exist here. Without a remap every
+      # table fails with ORA-00959 and takes its indexes, constraints and data
+      # with it, while the job still reports COMPLETED.
+      [ -n "$2" ] || usage
+      REMAP_TABLESPACES_LIST=$(echo "$2" | tr '[:lower:]' '[:upper:]')
+      if ! [[ "$REMAP_TABLESPACES_LIST" =~ ^[A-Z0-9_\$#]+=[A-Z0-9_\$#]+(,[A-Z0-9_\$#]+=[A-Z0-9_\$#]+)*$ ]]; then
+        echo "Error: -rt expects <old_tbs>=<new_tbs>[,<old_tbs>=<new_tbs>...], got: $2"
+        exit 1
+      fi
+      REMAP_TABLESPACES="-remaptablespaces ${REMAP_TABLESPACES_LIST}"
+      shift 2
+      ;;
+    *)
+      echo "Unknown parameter: $1"
+      usage
+      ;;
+  esac
+done
 
 # SQLcl hardcodes KEEP_MASTER=1, so the ISQL_<n> master table survives the job
 # and there is no switch to stop it (see scripts/sql/drop_dp_tables.sql). Drop it
@@ -64,7 +94,7 @@ sql -name "$SQLCRED_NAME" <<SQL
   -directory datapump_import_dir -
   -dumpfile ${USERNAME_LOWER}.dmp -
   -logfile ${USERNAME_LOWER}.log -
-  -version latest ${REMAP_SCHEMA}
+  -version latest ${REMAP_SCHEMA}${REMAP_TABLESPACES:+ $REMAP_TABLESPACES}
 
   commit;
 

@@ -95,6 +95,11 @@ guide. The release notes on GitHub hold the pull requests and the contributors.
 - `backup-all.sh` resolves the workspace of a schema correctly. It deletes the
   Data Pump master tables that it creates, because they made every later dump
   larger. It reports a failure through the exit code.
+- `import-datapump.sh` gains `-rt <old>=<new>`. The flag remaps the tablespaces
+  of the dump. Without it, a dump from another database fails on every table
+  with `ORA-00959`.
+- `import-backup.sh` gives `-rs` and the new `-rt` to `import-datapump.sh`
+  correctly. Earlier, `import-backup.sh <name> -rs <schema>` ignored the remap.
 
 ### Other scripts
 
