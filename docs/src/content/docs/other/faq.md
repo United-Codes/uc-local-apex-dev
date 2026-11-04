@@ -33,21 +33,21 @@ To upgrade before the next migration guide, change the ORDS version in the `dock
 - Click on Patch Set Bundle
 - Log in with your Oracle account
 - Download the zip file
-- Unzip the file
-- Start a terminal in the directory
+- Unzip the file, or keep the zip file
 - Run this command:
 
 ```sh
-sql -name local-26ai-sys @catpatch.sql
+./local-26ai.sh patch-apex {path_to_patch_directory_or_zip}
 ```
 
-To update the APEX images (the static assets), run this command:
+The command accepts the unzipped directory or the zip file. To use the current directory, run `./local-26ai.sh patch-apex .` from the patch directory.
 
-```sh
-# make sure you are in the directory of the unzipped patch directory
+The command does these steps:
 
-cp -r ./images/* {path_to_your_cloned_repo}/apex-images
-```
+1. It runs `catpatch.sql` as the `SYS` user.
+2. It copies the `images` directory of the patch into `apex-images`.
+
+If the APEX version in your browser looks old, do a hard refresh.
 
 ## An APEX upgrade failed halfway. How do I retry it?
 
