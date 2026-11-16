@@ -30,7 +30,7 @@ If you haven't installed uc-local-apex-dev yet, you can find the [setup instruct
   - `after-first-db-start.sh` now caps the undo datafile at 2048MB, sets `undo_retention` to 900, and caps `AUDIT_TRAIL` at 1GB. Undo autotuning grows an uncapped undo datafile without a limit, which was the cause of the failure above.
   - `after-first-db-start.sh` now creates the `UC_AUDIT_PURGE` job. The job keeps 7 days of unified audit records. The old code marked records as archivable but never purged them, so the audit tablespace grew forever. On one install it reached 1783MB.
   - `used-space.sh` gains `--summary` and `--quiet`, and it now reports through the exit code (`10` for `WARNING`, `11` for `CRITICAL`). The warning threshold moves from 10GB to 9.5GB. `SPACE_WARN_GB` and `SPACE_CRIT_GB` in `.env` change both thresholds.
-  - `stop.sh` now shows a warning if the database is close to the limit. This is the last point at which you can act.
+  - `stop.sh` now shows a warning if the database is close to the limit. This is the last point at which you can act. If the status is `CRITICAL`, the command runs `shrink-space --auto` first. If the status is still `CRITICAL` afterward, the command does not stop the database. Run `stop --force` to stop it anyway.
 
 ## Migration
 

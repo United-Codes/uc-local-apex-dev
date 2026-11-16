@@ -23,7 +23,7 @@ local-26ai.sh <command> [arguments]
 | Command | Description |
 | ------- | ----------- |
 | `start` | Start the database and ORDS containers. |
-| `stop` | Shut the database down cleanly, then stop the containers. |
+| `stop` | Shut the database down cleanly, then stop the containers. If the used space is `CRITICAL`, the command first runs `shrink-space --auto`. If the space is still `CRITICAL` afterward, the command does not stop anything and exits with code `11`. Run `stop --force` to skip the shrink and stop anyway. |
 
 See [Common Tasks → Managing Containers](/products/uc-local-apex-dev/docs/getting-started/common-tasks/#managing-containers).
 
@@ -66,7 +66,7 @@ See [Install Apps or Scripts](/products/uc-local-apex-dev/docs/getting-started/i
 | ------- | ----------- |
 | `used-space` | Show the used database space per tablespace, against the 12GB limit of the Free edition. `--summary` gives `key=value` lines, and `--quiet` gives the exit code alone. The exit code is `0` for OK, `10` for `WARNING`, and `11` for `CRITICAL`. |
 | `cap-tablespaces` | Give every datafile a size ceiling, so one datafile cannot fill the 12GB limit alone. `--check` reports and changes nothing. `--apply` sets the ceilings. `-y` skips the confirmation. |
-| `shrink-space` | Shrink tablespaces and datafiles to reclaim unused space. |
+| `shrink-space` | Shrink tablespaces and datafiles to reclaim unused space. The command asks two questions. With `--auto`, it does not ask. It purges the audit records and keeps the old APEX schemas. |
 | `compress-space <name>` | Enable Advanced Compression on the tablespace of a schema, rebuild its objects in compressed form, and return the free space to the operating system. `-y` skips the confirmation. |
 
 See [Common Tasks → Maintenance Tasks](/products/uc-local-apex-dev/docs/getting-started/common-tasks/#maintenance-tasks).

@@ -3,6 +3,17 @@
 
 set -e
 
+# --auto answers the questions without a prompt: purge the audit records (yes)
+# and drop old APEX schemas (no). stop.sh uses it. A run without a terminal
+# behaves the same way.
+AUTO=false
+for arg in "$@"; do
+  case "$arg" in
+    --auto) AUTO=true ;;
+    *) echo "Unknown option: $arg (supported: --auto)" >&2; exit 1 ;;
+  esac
+done
+
 source ./scripts/util/load_env.sh
 
 # The AUDIT_TRAIL datafile grows to several GB and never shrinks back. The cost is
@@ -35,7 +46,7 @@ source ./scripts/util/load_env.sh
 # nothing to purge does not abort the rest. Note the unified trail needs no
 # cleanup initialisation: dbms_audit_mgmt.init_cleanup carries pragma deprecate,
 # and is_cleanup_initialized raises ORA-46259 for UNIFIED_AUDIT_TRAIL.
-if [ -t 0 ]; then
+if [ "$AUTO" != "true" ] && [ -t 0 ]; then
   read -r -p "Purge audit records first (deletes audit history, frees audit data)? [Y/n] " purge_ans
 else
   purge_ans="Y"
@@ -129,11 +140,11 @@ if [ -z "$OLD_APEX" ]; then
 else
   echo "Found old APEX schema(s):"
   echo "$OLD_APEX" | sed 's/^/  /'
-  if [ -t 0 ]; then
+  if [ "$AUTO" != "true" ] && [ -t 0 ]; then
     read -r -p "Drop old APEX schema(s) above with CASCADE (irreversible)? [y/N] " drop_ans
   else
     drop_ans="N"
-    echo "Non-interactive mode: skipping old APEX drop for safety."
+    echo "Non-interactive or --auto mode: skipping old APEX drop for safety."
   fi
 
   if [[ $drop_ans == "y" ]] || [[ $drop_ans == "Y" ]]; then

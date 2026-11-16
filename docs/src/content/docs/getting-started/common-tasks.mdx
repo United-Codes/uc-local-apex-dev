@@ -104,7 +104,10 @@ make a full database smaller needs free space to work in.
 
 The `stop` command runs the same check before it shuts the database down. This is
 the last point at which you can act, because a database that is above the limit
-does not open again.
+does not open again. If the status is `CRITICAL`, the command runs `shrink-space --auto`
+first. If the status is still `CRITICAL` afterward, the command does not stop the
+database and exits with code `11`. To skip the shrink and stop the database
+anyway, run `local-26ai.sh stop --force`.
 
 ### Limit the Size of the Datafiles
 
