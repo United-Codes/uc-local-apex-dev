@@ -68,6 +68,7 @@ See [Install Apps or Scripts](/products/uc-local-apex-dev/docs/getting-started/i
 | `cap-tablespaces` | Give every datafile a size ceiling, so one datafile cannot fill the 12GB limit alone. `--check` reports and changes nothing. `--apply` sets the ceilings. `-y` skips the confirmation. |
 | `shrink-space` | Shrink tablespaces and datafiles to reclaim unused space. The command asks two questions. With `--auto`, it does not ask. It purges the audit records and keeps the old APEX schemas. |
 | `compress-space <name>` | Enable Advanced Compression on the tablespace of a schema, rebuild its objects in compressed form, and return the free space to the operating system. `-y` skips the confirmation. |
+| `create-purge-jobs` | Create the jobs `UC_APEX_DEBUG_PURGE` and `UC_LOGGER_PURGE`. Each job keeps 7 days of data. The command runs both jobs one time. |
 
 See [Common Tasks → Maintenance Tasks](/products/uc-local-apex-dev/docs/getting-started/common-tasks/#maintenance-tasks).
 
@@ -85,5 +86,6 @@ See [Common Tasks → Maintenance Tasks](/products/uc-local-apex-dev/docs/gettin
 | `create-self-signed-certificates` | Create self-signed SSL certificates so ORDS serves HTTPS on port 8443. Run with `sudo`. |
 | `install-dbms-cloud` | Install the `DBMS_CLOUD` package into the database. |
 | `upgrade-dbms-cloud` | Reload the `DBMS_CLOUD` packages after a change of the database image. The command stops with an error if `DBMS_CLOUD` is not installed. It does not change the wallet, and it does not restart the database. |
+| `install-utplsql [version] [--force]` | Install or upgrade utPLSQL in the schema `UTPLSQL`. The command downloads the latest release from GitHub and checks the checksum. It installs the DDL trigger. To upgrade, the command drops the schema and creates it again. It saves the password as `UTPLSQL_USER_PASSWORD` in `.env`. |
 
 See [Upgrade APEX](/products/uc-local-apex-dev/docs/migrations/upgrade-apex/) and [Common Tasks](/products/uc-local-apex-dev/docs/getting-started/common-tasks/).
