@@ -29,7 +29,7 @@ print_help() {
   for cmd in test-app-install test-script-install; do print_command "$cmd"; done
   echo
   echo "Disk Space:"
-  for cmd in used-space shrink-space compress-space cap-tablespaces; do print_command "$cmd"; done
+  for cmd in used-space shrink-space compress-space cap-tablespaces create-purge-jobs; do print_command "$cmd"; done
   echo
   echo "Setup & Maintenance:"
   for cmd in after-first-db-start upgrade-apex patch-apex repair-ru-dictionary unexpire-accounts set-open-cursors disable-password-expiration disable-archive-logs create-self-signed-certificates install-dbms-cloud upgrade-dbms-cloud; do print_command "$cmd"; done
