@@ -5,15 +5,21 @@ description: A new Oracle Database version is released. It should work with the 
 
 ## New Oracle Database version released
 
-**First, check that the release is adoptable at all.** Changing the image tag on
-an existing `oradata` volume does not upgrade the data dictionary, and neither
-`datapatch` nor `catupgrd` corrects it. Run the `db-ru-dictionary-check` skill
-(`.agents/skills/db-ru-dictionary-check/SKILL.md`) before anything below. It
-tells you whether an in-place swap plus `scripts/repair-ru-dictionary.sh` is
-safe, or whether this release needs a Data Pump migration instead. Its outcome
-decides what the migration guide has to say.
+Each DB version bump gets a new branch (it becomes the new default). The
+migration guide offers two paths, see `docs/src/content/docs/migrations/upgrade-database.mdx`:
 
-Use `gh run list --workflow=test-db-upgrade.yml` to check if a recent successful run of the `test-db-upgrade.yml` workflow exists. If not, ask the user if they want to trigger a new run with the new database version. First verify that such a version exists on the repo.
+- **Image swap**: same `oradata` volume, new image. The data survives, but the
+  data dictionary keeps the old release update (no supported tool upgrades it),
+  and the in-database JVM breaks silently (`fix-jvm` repairs it).
+- **Export and import**: `rebuild` backs up the running old database, installs
+  the new image, and imports everything.
+
+Test both before you write the guide:
+
+- Image swap: install the old image on the test host, start the new image on the
+  same volume, run `fix-jvm`, check data, APEX and JVM.
+- Export and import: run `gh workflow run test-backup-restore.yml -f target_db_image=<new tag>`
+  (check `gh run list --workflow=test-backup-restore.yml` first). Ask the user before you trigger it.
 
 ## Upgrade DB locally
 

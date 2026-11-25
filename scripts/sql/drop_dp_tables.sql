@@ -18,7 +18,15 @@ BEGIN
   <<master_tables>>
   FOR tab_rec IN (SELECT table_name
                   FROM user_tables
-                  WHERE REGEXP_LIKE(table_name, '^(ESQL|ISQL)_[0-9]+$'))
+                  WHERE REGEXP_LIKE(table_name, '^(ESQL|ISQL)_[0-9]+$')
+                    -- A schema that is not in .env runs DataPump as SYS. Then the
+                    -- master tables of ALL jobs are in the schema SYS, and two
+                    -- jobs can run at once (import-all -j). Drop only the tables of
+                    -- jobs that are finished: a table of a running job is in use,
+                    -- and dropping it kills the job (ORA-39014).
+                    AND (USER <> 'SYS'
+                         OR EXISTS (SELECT 1 FROM user_datapump_jobs j
+                                     WHERE j.job_name = table_name AND j.state = 'NOT RUNNING')))
   LOOP
     BEGIN
       l_sql := 'DROP TABLE ' || DBMS_ASSERT.ENQUOTE_NAME(tab_rec.table_name) || ' PURGE';

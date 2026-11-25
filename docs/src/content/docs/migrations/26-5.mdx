@@ -1,0 +1,137 @@
+---
+title: Migrate to 26.5
+description: Migration guide for 26.4 -> 26.5
+sidebar:
+  order: 80
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+For a first install, see the [setup instructions](/products/uc-local-apex-dev/docs/getting-started/).
+
+**This guide starts from 26.4. If you are on an earlier release, complete the previous migrations first.**
+
+## Changes
+
+- ORDS 26.2.2 → 26.3.1. ORDS upgrades its own schema on the first start. No action is necessary.
+- New script `scripts/create-purge-jobs.sh` (`local-26ai.sh create-purge-jobs`). It creates two scheduler jobs. Each job keeps 7 days of data.
+  - `UC_APEX_DEBUG_PURGE` runs every day at 03:20. It calls `apex_debug.remove_debug_by_age` for every application. Debug messages without an application stay. APEX removes them when it rotates its debug tables. On one install the debug tables held 455MB.
+  - `UC_LOGGER_PURGE` runs every day at 03:25. It deletes Logger rows that are older than 7 days from every schema that has a `LOGGER_LOGS` table. It keeps rows with the level `permanent` (level 1).
+- New script `scripts/install-utplsql.sh` (`local-26ai.sh install-utplsql`). It installs or upgrades utPLSQL.
+  - The command downloads the latest release from GitHub. If the release has a checksum file, the command compares the checksum.
+  - It installs utPLSQL in the schema `UTPLSQL` with the DDL trigger and public synonyms.
+  - It saves a random password as `UTPLSQL_USER_PASSWORD` in `.env`. If this entry exists, the command uses it.
+  - The utPLSQL documentation says an upgrade needs a remove and a new install. If another version is installed, the command drops the schema `UTPLSQL` and its objects and creates it again. It also drops every public synonym that points to `UTPLSQL`, also synonyms that you created. The command keeps the tablespace `TBS_UTPLSQL`.
+  - If the installed version is the target version, the command does nothing. Use `--force` to install again. Use `install-utplsql 3.2.2` to install a specific release.
+- New script `scripts/fix-jvm.sh` (`local-26ai.sh fix-jvm`). A change of the database image can stop the in-database JVM without a message. The script tests the JVM and reloads it if it is broken.
+- New script `scripts/export-gaps.sh` (`local-26ai.sh export-gaps`). It shows what a schema export does not carry. It writes SQL files for the roles, grants, public synonyms, network entries, policies, and other objects. `backup-all` runs it first and also backs up the schemas that are not in `.env`. `import-all` runs the files and then compares every object with the backup. The files also restore scheduler windows, Resource Manager plans, editions, proxy users, and the files of custom directories. The list of secrets that no backup holds is shown at the end. See [Backups](/products/uc-local-apex-dev/docs/getting-started/backups/).
+- New script `scripts/test-backup-fixtures.sh`. It creates hand-made objects on a test database and compares them before and after a `rebuild`.
+- New script `scripts/rebuild.sh` (`local-26ai.sh rebuild`). It runs a backup, deletes the database volume, installs a new database, and imports everything.
+- `import-all` has the options `-y` (no confirmation) and `-j N` (N parallel DataPump imports). On Linux, `import-all` stopped after the first schema. This change corrects that failure.
+- `backup-user` and `import-backup` copy only the dump of their own schema now. `backup-user` stops if the export produced no new dump. Before this change, a failed export sometimes used an old dump.
+- `docker-compose.yml` reads the container name, the volume name, and the host ports from `.env`: `CONTAINER_NAME`, `DB_VOLUME_NAME`, `DB_HOST_PORT`, `ORDS_HTTP_PORT`, and `ORDS_HTTPS_PORT`. Without these keys, the names and ports do not change. To run a second database on the same host, use a second clone of the repository. Set these keys and also `COMPOSE_PROJECT_NAME`, `DB_CONN_BASE`, and `DB_CONN_NAME` in its `.env`. The first `start` after the update creates the containers again. The data stays in the volume. Run `stop` before you update the repository. If a key is also set in your shell, the shell value wins.
+- `after-first-db-start.sh` now creates the two jobs on a new install. An installed database does not run this script again. Existing installs need `create-purge-jobs` one time.
+- `used-space.sh` now shows more detail in the full report.
+  - For every tablespace with 1GB or more of used space, it lists the 10 largest segments. LOB segments and indexes show the table that they belong to.
+  - It lists the 10 applications with the largest APEX file content. The list shows the workspace, the application, and the size of the application files, static files, and plug-in files.
+  - The options `--summary` and `--quiet` and the exit codes do not change.
+
+<Aside type="note">
+  A delete does not return space to the operating system. The jobs stop the tables from growing.
+  `shrink-space` returns the space.
+</Aside>
+
+## Migration
+
+### Update the repository
+
+Stop the database. The first start after the update creates the containers again:
+
+```sh
+./local-26ai.sh stop
+```
+
+Get the new release:
+
+```sh
+git fetch
+git checkout 26-5
+```
+
+Start the database and ORDS:
+
+```sh
+./local-26ai.sh start
+```
+
+Make sure that both containers show `healthy` or `Up`. Podman users run `podman ps`:
+
+```sh
+docker ps
+```
+
+### Create the purge jobs
+
+Give permission to the new script:
+
+```sh
+chmod +x ./scripts/create-purge-jobs.sh
+```
+
+<Aside type="caution" title="create-purge-jobs deletes old logs">
+  `create-purge-jobs` runs both jobs one time. This step deletes APEX debug messages and Logger rows that are older than 7 days. You cannot undo it. If you need older debug messages or logs, back them up first.
+</Aside>
+
+Create the jobs:
+
+```sh
+./local-26ai.sh create-purge-jobs
+```
+
+Make sure that the output contains `initial purge done`. If it shows `skip initial purge`, the jobs exist, but the first run failed. The jobs run again at night. You can run the command again.
+
+### Install utPLSQL
+
+Do this step only if you want utPLSQL. Give permission to the new script:
+
+```sh
+chmod +x ./scripts/install-utplsql.sh
+```
+
+<Aside type="caution" title="install-utplsql drops the schema UTPLSQL">
+  If another utPLSQL version is installed, `install-utplsql` drops the schema `UTPLSQL` and its objects. Back up the objects that you created in this schema first.
+</Aside>
+
+Install or upgrade utPLSQL:
+
+```sh
+./local-26ai.sh install-utplsql
+```
+
+### Reclaim space
+
+`shrink-space` asks two questions. The first question is about the purge of the audit records. A purge deletes the audit history. The second question is about the drop of old APEX schemas. A drop cannot be undone.
+
+Run `shrink-space` to return the freed space:
+
+```sh
+./local-26ai.sh shrink-space
+```
+
+### Verify
+
+Connect to `FREEPDB1` as `SYS`, for example with `sql -name local-26ai-sys`. Show the jobs:
+
+```sql
+select job_name, enabled, next_run_date
+  from dba_scheduler_jobs
+ where job_name in ('UC_APEX_DEBUG_PURGE', 'UC_LOGGER_PURGE');
+```
+
+Make sure that both jobs show `TRUE` in the column `enabled`.
+
+Then show the new report:
+
+```sh
+./local-26ai.sh used-space
+```

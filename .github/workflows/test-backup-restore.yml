@@ -1,0 +1,170 @@
+name: Test backup and restore
+
+# End-to-end test of the export / import workflow:
+#
+#   install.sh -> seed a schema + hand-made fixtures -> probe
+#   -> rebuild (backup-all, wipe volume, install.sh, import-all) -> probe -> compare
+#
+# With the input `target_db_image`, the rebuild installs that image instead of the
+# pinned one. This is the "upgrade by export and import" path of a new release:
+# back up on the old database, install the new one, import.
+#
+# The run needs ~60 minutes (two installs plus the backup and the import).
+on:
+  workflow_dispatch:
+    inputs:
+      target_db_image:
+        description: "Optional. DB image tag for the new database, e.g. 23.26.4.0. Empty = same image as docker-compose.yml."
+        required: false
+        default: ""
+  pull_request:
+    paths:
+      - "scripts/backup-*.sh"
+      - "scripts/import-*.sh"
+      - "scripts/export-gaps.sh"
+      - "scripts/rebuild.sh"
+      - "scripts/sync-backups-folder.sh"
+      - "scripts/test-backup-fixtures.sh"
+      - "scripts/util/manifest.sh"
+      - "scripts/util/schema-access.sh"
+      - "scripts/sql/export_gaps.sql"
+      - "scripts/sql/manifest.sql"
+      - "scripts/sql/test_fixtures_*.sql"
+      - ".github/workflows/test-backup-restore.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  backup-restore:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+
+    env:
+      CONTAINER_CLI: docker
+      # Empty on pull_request runs.
+      TARGET_DB_IMAGE: ${{ inputs.target_db_image || '' }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Two DB images (old and new) plus oradata and the dumps do not fit in the
+      # default free space. large-packages is on here, unlike the install test.
+      - name: Free up disk space
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: true
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          swap-storage: false
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install SQLcl (latest)
+        run: |
+          set -euo pipefail
+          curl -fsSL -o "$RUNNER_TEMP/sqlcl.zip" \
+            https://download.oracle.com/otn_software/java/sqldeveloper/sqlcl-latest.zip
+          unzip -q "$RUNNER_TEMP/sqlcl.zip" -d "$HOME"
+          echo "$HOME/sqlcl/bin" >> "$GITHUB_PATH"
+          "$HOME/sqlcl/bin/sql" -V
+
+      - name: Install the pinned version
+        run: ./install.sh
+
+      # RESTORE_TEST holds data and many object types (seed.sql). The fixtures
+      # add what a schema export does not carry: users, grants, synonyms, jobs,
+      # windows, plans, editions, directories, policies, a workspace, ORDS modules.
+      - name: Seed schema and fixtures
+        run: |
+          set -euo pipefail
+          # shellcheck disable=SC1091
+          source ./scripts/util/load_env.sh
+          ./scripts/create-user.sh RESTORE_TEST
+          sql -S -name "${DB_CONN_BASE}-restore_test" @"$PWD/.github/fixtures/upgrade/seed.sql"
+          ./scripts/test-backup-fixtures.sh create
+
+      - name: Baseline (before the rebuild)
+        run: |
+          set -euo pipefail
+          # shellcheck disable=SC1091
+          source ./scripts/util/load_env.sh
+          sql -S -name "${DB_CONN_BASE}-restore_test" @"$PWD/.github/fixtures/upgrade/verify.sql" \
+            | sed 's/[[:space:]]*$//' | tee verify-before.out
+          grep -qx 'invalid=0' verify-before.out
+          ./scripts/test-backup-fixtures.sh probe probe-before.txt
+
+      - name: Point docker-compose.yml at the target image
+        run: |
+          set -euo pipefail
+          if [ -z "$TARGET_DB_IMAGE" ]; then
+            echo "No target image. The rebuild uses the pinned image."
+            exit 0
+          fi
+          sed -i -E "s#(image: container-registry.oracle.com/database/free:).*#\1${TARGET_DB_IMAGE}#" docker-compose.yml
+          grep -n 'database/free:' docker-compose.yml
+
+      # rebuild exits 2 when everything that a backup can hold came back, but
+      # secrets must be entered again. The fixtures create such secrets on purpose.
+      - name: Rebuild (backup-all, wipe, install, import-all)
+        run: |
+          set -u
+          ./scripts/rebuild.sh -y --accept-losses 2>&1 | tee rebuild.log
+          rc=${PIPESTATUS[0]}
+          echo "rebuild exit code: $rc"
+          test "$rc" = 0 || test "$rc" = 2
+
+      - name: Compare (after the rebuild)
+        run: |
+          set -euo pipefail
+          # shellcheck disable=SC1091
+          source ./scripts/util/load_env.sh
+
+          sql -S -name "${DB_CONN_BASE}-restore_test" @"$PWD/.github/fixtures/upgrade/verify.sql" \
+            | sed 's/[[:space:]]*$//' | tee verify-after.out
+          # Every line except the version must be the same.
+          diff <(grep -v '^version_full=' verify-before.out) <(grep -v '^version_full=' verify-after.out)
+
+          if [ -n "$TARGET_DB_IMAGE" ]; then
+            grep '^version_full=' verify-after.out
+            grep -q "^version_full=${TARGET_DB_IMAGE}" verify-after.out
+          fi
+
+          ./scripts/test-backup-fixtures.sh probe probe-after.txt
+          # These fixtures are in unrecoverable.txt on purpose: a web credential
+          # (secret), unsent mails, an object in a non-default edition, a SQL
+          # Firewall allow list, and a SQL plan baseline. They must differ.
+          expected='^(apex\.credential|apex\.mailqueue|edition\.object|firewall\.list|spm\.baseline)\|'
+          grep -Ev "$expected" probe-before.txt > pb.txt
+          grep -Ev "$expected" probe-after.txt  > pa.txt
+          ./scripts/test-backup-fixtures.sh compare pb.txt pa.txt
+
+          # The unrecoverable list must name them.
+          cat ./backups/import/recovery/unrecoverable.txt
+
+      - name: Collect logs on failure
+        if: failure()
+        run: |
+          mkdir -p artifacts
+          cp -f rebuild.log probe-*.txt verify-*.out artifacts/ 2>/dev/null || true
+          cp -R ./backups/import/logs ./backups/import/recovery artifacts/ 2>/dev/null || true
+          docker compose logs --no-color 26ai      > artifacts/db.log   2>&1 || true
+          docker compose logs --no-color ords-26ai > artifacts/ords.log 2>&1 || true
+
+      - name: Upload failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backup-restore-logs
+          path: artifacts/
+          if-no-files-found: ignore

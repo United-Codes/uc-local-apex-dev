@@ -18,6 +18,15 @@ fi
 USERNAME=$1
 USERNAME_LOWER=$(echo "$USERNAME" | tr '[:upper:]' '[:lower:]')
 SQLCRED_NAME="${DB_CONN_BASE}-${USERNAME_LOWER}"
+
+# A schema that is not in .env was made by hand (see schema-access.sh). Import as
+# SYS: the owner may lack privileges that the objects need, for example CREATE
+# SYNONYM for a synonym that SYS made. SYS also creates objects in any schema.
+source ./scripts/util/user_in_env.sh
+if ! user_in_env_bool "$USERNAME"; then
+  SQLCRED_NAME="$DB_CONN_NAME"
+  echo "$USERNAME is not in .env: importing as SYS"
+fi
 shift
 
 # Parse optional parameters
@@ -59,6 +68,16 @@ while [ $# -gt 0 ]; do
   esac
 done
 
+# Deep Data Security: data grants that DataPump imports are in the dictionary,
+# but they do not work (23.26: an end user still gets ORA-00942). Leave their XS
+# objects out. 10_post.sql of the recovery creates the data grants again.
+EXCLUDE_XS=""
+DG_SCHEMAS=./backups/import/recovery/data_grant_schemas.txt
+if [ -f "$DG_SCHEMAS" ] && grep -qix "$USERNAME" "$DG_SCHEMAS"; then
+  EXCLUDE_XS=" -excludelist XS_SECURITY"
+  echo "$USERNAME has Deep Data Security data grants: the import leaves out their XS objects. 10_post.sql creates the grants."
+fi
+
 # SQLcl hardcodes KEEP_MASTER=1, so the ISQL_<n> master table survives the job
 # and there is no switch to stop it (see scripts/sql/drop_dp_tables.sql). Drop it
 # from a trap so an import that dies half way does not leave one behind.
@@ -94,7 +113,7 @@ sql -name "$SQLCRED_NAME" <<SQL
   -directory datapump_import_dir -
   -dumpfile ${USERNAME_LOWER}.dmp -
   -logfile ${USERNAME_LOWER}.log -
-  -version latest ${REMAP_SCHEMA}${REMAP_TABLESPACES:+ $REMAP_TABLESPACES}
+  -version latest ${REMAP_SCHEMA}${REMAP_TABLESPACES:+ $REMAP_TABLESPACES}${EXCLUDE_XS}
 
   commit;
 

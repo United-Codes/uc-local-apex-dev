@@ -218,6 +218,38 @@ failure does not come back:
 ./local-26ai.sh shrink-space
 ```
 
+## The image pull fails with "unauthorized: Auth failed". What do I do?
+
+The `install.sh` script stops in the step `Pull container images`. The error looks like this:
+
+```
+Error response from daemon: Head "https://container-registry.oracle.com/v2/database/free/manifests/23.26.3.0": unauthorized: Auth failed.
+```
+
+The database and ORDS images of this project are public. You do not need a login to pull them.
+
+A stale login is a frequent cause. Docker or Podman saved an old login for the Oracle registry, for example from an earlier test of Oracle images. The saved login is not valid now. The engine sends it with the pull, and the registry rejects the request.
+
+1. Delete the saved login:
+
+   ```sh
+   docker logout container-registry.oracle.com   # or: podman logout container-registry.oracle.com
+   ```
+
+2. Run the installation again:
+
+   ```sh
+   ./install.sh
+   ```
+
+If the failure continues, pull the image by hand. Use the engine that ran `install.sh`, and the image and tag of the error message. This shows if the failure comes from the script or from the engine:
+
+```sh
+docker pull container-registry.oracle.com/database/free:23.26.3.0   # or: podman pull ...
+```
+
+If the pull still fails, make sure that no VPN or proxy changes the requests to the registry. An update of Docker Desktop or Podman can also help.
+
 ## The installation stops at `Container local-26ai Waiting`. What do I do?
 
 Update your copy of the repository. `install.sh` now starts the database alone,

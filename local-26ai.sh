@@ -23,7 +23,7 @@ print_help() {
   for cmd in create-user clear-schema drop-user; do print_command "$cmd"; done
   echo
   echo "Backups & Import:"
-  for cmd in backup-all backup-user import-backup import-datapump import-all sync-backups-folder fix-ws-group-ids; do print_command "$cmd"; done
+  for cmd in backup-all backup-user export-gaps import-backup import-datapump import-all rebuild sync-backups-folder fix-ws-group-ids; do print_command "$cmd"; done
   echo
   echo "Testing:"
   for cmd in test-app-install test-script-install; do print_command "$cmd"; done
@@ -32,7 +32,7 @@ print_help() {
   for cmd in used-space shrink-space compress-space cap-tablespaces create-purge-jobs; do print_command "$cmd"; done
   echo
   echo "Setup & Maintenance:"
-  for cmd in after-first-db-start upgrade-apex patch-apex repair-ru-dictionary unexpire-accounts set-open-cursors disable-password-expiration disable-archive-logs create-self-signed-certificates install-dbms-cloud upgrade-dbms-cloud install-utplsql; do print_command "$cmd"; done
+  for cmd in after-first-db-start upgrade-apex patch-apex fix-jvm unexpire-accounts set-open-cursors disable-password-expiration disable-archive-logs create-self-signed-certificates install-dbms-cloud upgrade-dbms-cloud install-utplsql; do print_command "$cmd"; done
   echo
   echo "Docs: https://www.united-codes.com/products/uc-local-apex-dev/docs/"
 }
@@ -54,7 +54,6 @@ case "$script_name" in
   backup) script_name="backup-all" ;;
   restore) script_name="import-backup" ;;
   disk-space|space) script_name="used-space" ;;
-  upgrade-db-dictionary) script_name="repair-ru-dictionary" ;;
   restart)
     cd "$SCRIPT_DIR"
     ./scripts/stop.sh "$@"

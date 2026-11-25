@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-sql sys/$ORACLE_PASSWORD@localhost:1521/FREEPDB1 as SYSDBA <<SQL
+sql sys/"$ORACLE_PASSWORD"@localhost:"${DB_HOST_PORT:-1521}"/FREEPDB1 as SYSDBA <<SQL
   select user from dual;
 
   conn -save $DB_CONN_NAME -savepwd -replace

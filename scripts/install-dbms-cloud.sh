@@ -137,7 +137,7 @@ EOF
 
 # ssl_wallet is a database-wide property and must be set in the CDB root
 # (ORA-65040 when run from a PDB).
-sql sys/"$ORACLE_PASSWORD"@localhost:"$DBPORT"/FREE as SYSDBA <<EOF
+sql sys/"$ORACLE_PASSWORD"@localhost:"${DB_HOST_PORT:-1521}"/FREE as SYSDBA <<EOF
 alter database property set ssl_wallet='file:/opt/oracle/oradata/wallets/ssl';
 
 exit

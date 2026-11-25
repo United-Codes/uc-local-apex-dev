@@ -45,8 +45,11 @@ See [Creating Users](/products/uc-local-apex-dev/docs/getting-started/creating-u
 | `backup-user <name>` | Export a single schema with DataPump, with its APEX workspace and applications. |
 | `import-backup <name>` | Restore a schema from a backup. If the user does not exist, the script creates it first. |
 | `import-datapump <name> [-rs <target>] [-rt <old>=<new>]` | Import a DataPump dump for a schema. With `-rs` the script imports the dump into a different schema name. With `-rt` the script puts the tables of a dump tablespace into a local tablespace. |
-| `import-all` | Import every export file in `./backups/import`. Use it during a migration. |
-| `sync-backups-folder` | Copy `./backups/import` into the DataPump directory of the container, and copy new exports back out. |
+| `import-all [-y] [-j N]` | Import the schemas of `./backups/import/recovery/schemas.tsv`, or of `.env` if that file does not exist. Use it during a migration. `-y` skips the confirmation. `-j N` runs the DataPump import of N schemas at the same time. The command runs `recovery/00_pre.sql` before and `recovery/10_post.sql` after the imports, puts back the files of custom directories, and then compares the object names with `recovery/manifest.tsv`. |
+| `export-gaps` | Show what a schema export does not carry. It writes `00_pre.sql`, `10_post.sql`, `schemas.tsv`, `manifest.tsv`, `dirs.tsv`, the files of custom directories, and `unrecoverable.txt` to `./backups/export/recovery`. `backup-all` runs it first. |
+| `rebuild [-y] [-j N] [--accept-losses]` | Run `backup-all`, delete the database volume, install a new database, and run `import-all`. The command shows what no backup holds and asks you to type the volume name. Exit code 2 means that the import was successful, but you must do the steps in `unrecoverable.txt`. |
+| `test-backup-fixtures create\|probe\|compare\|drop` | Create hand-made users, grants, jobs, and policies on a test database, and compare them before and after a restore. Do not run it on a database that you use. |
+| `sync-backups-folder [push\|pull\|both] [schema]` | Copy `./backups/import` into the DataPump directory of the container, and copy new exports back out. A schema needs `push` or `pull`. Then the command copies only the dump of that schema, and with `pull` also its log. The APEX and ORDS files stay on the host. |
 | `fix-ws-group-ids` | Delete the group IDs from the APEX workspace export files in `./backups/import`, so the files import correctly. |
 
 See [Backups](/products/uc-local-apex-dev/docs/getting-started/backups/) and [Common Tasks → Workspace Import/Export](/products/uc-local-apex-dev/docs/getting-started/common-tasks/#workspace-importexport).
@@ -78,7 +81,7 @@ See [Common Tasks → Maintenance Tasks](/products/uc-local-apex-dev/docs/gettin
 | ------- | ----------- |
 | `after-first-db-start` | Install APEX and apply the defaults for development. `install.sh` runs this command. You need it only for a manual installation. |
 | `upgrade-apex` | Download the latest APEX version, run the installer, copy the images, and set the workspace settings again. |
-| `repair-ru-dictionary` | Repair the data dictionary after a change of the database image. A new release update adds dictionary views and a new in-database JVM, and the image change does not install them. `--check` reports and changes nothing. `--repair` applies the repair. `--summary` gives `key=value` lines. |
+| `fix-jvm [--force]` | Reload the in-database JVM after a change of the database image. The image change can stop the JVM without a message, and every Java call then raises `ORA-29548`. The command tests the JVM first and does nothing if it works. `--force` reloads it anyway. |
 | `unexpire-accounts` | Unlock the APEX and ORDS accounts. This corrects an "Account Is Locked" message. |
 | `set-open-cursors [value]` | Raise the `open_cursors` setting of the database. The default of the Free image is too low for the APEX import of a large application, which then fails with `ORA-01000`. The default value is `1000`. The command raises the setting only, and never lowers it. `install.sh` runs this command. |
 | `disable-password-expiration` | Stop the passwords of database accounts from expiring. |
@@ -86,6 +89,6 @@ See [Common Tasks → Maintenance Tasks](/products/uc-local-apex-dev/docs/gettin
 | `create-self-signed-certificates` | Create self-signed SSL certificates so ORDS serves HTTPS on port 8443. Run with `sudo`. |
 | `install-dbms-cloud` | Install the `DBMS_CLOUD` package into the database. |
 | `upgrade-dbms-cloud` | Reload the `DBMS_CLOUD` packages after a change of the database image. The command stops with an error if `DBMS_CLOUD` is not installed. It does not change the wallet, and it does not restart the database. |
-| `install-utplsql [version] [--force]` | Install or upgrade utPLSQL in the schema `UTPLSQL`. The command downloads the latest release from GitHub and checks the checksum. It installs the DDL trigger. To upgrade, the command drops the schema and creates it again. It saves the password as `UTPLSQL_USER_PASSWORD` in `.env`. |
+| `install-utplsql [version] [--force]` | Install or upgrade utPLSQL in the schema `UTPLSQL`. The command downloads the latest release from GitHub and checks the checksum. It installs the DDL trigger. To upgrade, the command drops the schema and creates it again. It saves the password as `UTPLSQL_USER_PASSWORD` in `.env`. See [utPLSQL](/products/uc-local-apex-dev/docs/getting-started/utplsql/). |
 
 See [Upgrade APEX](/products/uc-local-apex-dev/docs/migrations/upgrade-apex/) and [Common Tasks](/products/uc-local-apex-dev/docs/getting-started/common-tasks/).

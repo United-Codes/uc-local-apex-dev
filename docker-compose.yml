@@ -1,12 +1,15 @@
-name: uc-local-apex-dev
+# The names, the host ports and the volume come from .env (DB_HOST_PORT, ORDS_HTTP_PORT, ORDS_HTTPS_PORT, CONTAINER_NAME, DB_VOLUME_NAME). The defaults give the
+# standard install. Set them in .env to run a second, separate database on the
+# same host, for example to test a restore.
+name: ${COMPOSE_PROJECT_NAME:-uc-local-apex-dev}
 services:
   26ai:
     ports:
-      - 1521:1521
+      - ${DB_HOST_PORT:-1521}:1521
     env_file:
       - ./.env
     volumes:
-      - oradata-26ai:/opt/oracle/oradata
+      - oradata:/opt/oracle/oradata
     restart: "${RESTART_POLICY:-no}"
     healthcheck:
       test:
@@ -16,13 +19,13 @@ services:
       retries: 10
       start_period: 5s
       #start_interval: 5s
-    container_name: local-26ai
+    container_name: ${CONTAINER_NAME:-local-26ai}
     image: container-registry.oracle.com/database/free:23.26.3.0
 
   ords-26ai:
     ports:
-      - 8181:8080
-      - 8443:8443
+      - ${ORDS_HTTP_PORT:-8181}:8080
+      - ${ORDS_HTTPS_PORT:-8443}:8443
     volumes:
       - type: bind
         source: ords-config
@@ -53,12 +56,12 @@ services:
       26ai:
         condition: service_healthy
     image: container-registry.oracle.com/database/ords:26.3.1
-    container_name: local-26ai-ords
+    container_name: ${CONTAINER_NAME:-local-26ai}-ords
 
 networks:
   default:
     driver: bridge
 
 volumes:
-  oradata-26ai:
-    name: oradata-26ai
+  oradata:
+    name: ${DB_VOLUME_NAME:-oradata-26ai}
