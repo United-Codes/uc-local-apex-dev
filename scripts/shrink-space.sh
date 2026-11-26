@@ -56,8 +56,8 @@ if [[ $purge_ans == "n" ]] || [[ $purge_ans == "N" ]]; then
   echo "Skipping audit purge."
 else
   echo "Purging audit records..."
-  sql -name "$DB_CONN_NAME" <<SQL
-set serveroutput on
+  sql -S -name "$DB_CONN_NAME" <<SQL
+set serveroutput on feedback off
 begin
   dbms_audit_mgmt.set_last_archive_timestamp(
     audit_trail_type  => dbms_audit_mgmt.audit_trail_unified,
@@ -223,14 +223,21 @@ fi
 # reclaim it. Shrinking the LOB releases that space back into TBS_APEX first, then
 # the tablespace shrink resizes the datafile down. LOB shrink is online and
 # non-destructive (it compacts, never deletes live content).
-sql -name "$DB_CONN_NAME" <<SQL
-set serveroutput on
+# The output stays short: -S hides the SQLcl banner, "feedback off" hides the
+# "PL/SQL procedure successfully completed" lines, and the tablespace loop keeps
+# only one line per tablespace that changed. shrink_tablespace prints a block per
+# call through dbms_output. The loop reads that output back with get_lines and
+# keeps only the "Failed" lines.
+sql -S -name "$DB_CONN_NAME" <<SQL
+set serveroutput on size unlimited feedback off
 
-prompt Space usage before shrinking:
-SELECT
-    ROUND(SUM(bytes) / 1024 / 1024 / 1024, 2) AS current_gb
-FROM dba_data_files
-;
+declare
+  l_gb number;
+begin
+  select round(sum(bytes) / 1024 / 1024 / 1024, 2) into l_gb from dba_data_files;
+  sys.dbms_output.put_line('Space used before shrinking: ' || l_gb || ' GB');
+end;
+/
 
 prompt Shrinking FLOWS_FILES LOB:
 
@@ -246,9 +253,9 @@ begin
     begin
       execute immediate 'ALTER TABLE "'||rec.owner||'"."'||rec.table_name||
         '" MODIFY LOB ("'||rec.column_name||'") (SHRINK SPACE)';
-      dbms_output.put_line('shrank lob '||rec.table_name||'.'||rec.column_name);
+      dbms_output.put_line('  shrank lob '||rec.table_name||'.'||rec.column_name);
     exception when others then
-      dbms_output.put_line('skip lob '||rec.table_name||'.'||rec.column_name||': '||sqlerrm);
+      dbms_output.put_line('  skip lob '||rec.table_name||'.'||rec.column_name||': '||sqlerrm);
     end;
   end loop;
 end;
@@ -256,6 +263,21 @@ end;
 
 prompt Shrinking tablespaces:
 
+declare
+  type l_out_t is table of varchar2(600 char);
+  l_out       l_out_t := l_out_t();
+  l_lines     sys.dbms_output.chararr;
+  l_n         integer;
+  l_before    number;
+  l_after     number;
+  l_unchanged pls_integer := 0;
+  l_failures  l_out_t;
+
+  procedure add_line(p_line in varchar2) is
+  begin
+    l_out.extend;
+    l_out(l_out.last) := p_line;
+  end add_line;
 begin
   for rec in (
     select tablespace_name
@@ -265,12 +287,44 @@ begin
         or tablespace_name = 'AUDIT_TRAIL'
   )
   loop
+    l_failures := l_out_t();
+    select sum(bytes) into l_before from dba_data_files
+     where tablespace_name = rec.tablespace_name;
+
     begin
       dbms_space.shrink_tablespace(rec.tablespace_name);
     exception when others then
-      dbms_output.put_line('skip '||rec.tablespace_name||': '||sqlerrm);
+      l_failures.extend;
+      l_failures(l_failures.last) := '  skip: ' || sqlerrm;
     end;
+
+    select sum(bytes) into l_after from dba_data_files
+     where tablespace_name = rec.tablespace_name;
+
+    l_n := 1000;
+    sys.dbms_output.get_lines(l_lines, l_n);
+    for i in 1 .. l_n loop
+      if l_lines(i) like 'Failed%' then
+        l_failures.extend;
+        l_failures(l_failures.last) := '  ' || trim(l_lines(i));
+      end if;
+    end loop;
+
+    if l_before - l_after >= 1024 * 1024 or l_failures.count > 0 then
+      add_line(rpad(rec.tablespace_name, 24) || lpad(round(l_before / 1024 / 1024), 6) ||
+        ' MB -> ' || lpad(round(l_after / 1024 / 1024), 6) || ' MB');
+      for i in 1 .. l_failures.count loop
+        add_line(l_failures(i));
+      end loop;
+    else
+      l_unchanged := l_unchanged + 1;
+    end if;
   end loop;
+
+  for i in 1 .. l_out.count loop
+    sys.dbms_output.put_line(l_out(i));
+  end loop;
+  sys.dbms_output.put_line(l_unchanged || ' tablespaces had nothing to shrink.');
 end;
 /
 SQL
@@ -287,8 +341,8 @@ SQL
 # Non-destructive: Oracle raises ORA-03297 if the target would truncate used
 # data, so a too-small size is rejected (caught below), never lossy. We re-read
 # the HWM on each of a few attempts in case concurrent DML nudges it up.
-sql -name "$DB_CONN_NAME" <<SQL
-set serveroutput on
+sql -S -name "$DB_CONN_NAME" <<SQL
+set serveroutput on feedback off
 
 prompt Resizing datafiles down to their high-water mark:
 
@@ -344,11 +398,13 @@ begin
 end;
 /
 
-prompt Space usage after shrinking:
-SELECT
-    ROUND(SUM(bytes) / 1024 / 1024 / 1024, 2) AS current_gb
-FROM dba_data_files
-;
+declare
+  l_gb number;
+begin
+  select round(sum(bytes) / 1024 / 1024 / 1024, 2) into l_gb from dba_data_files;
+  sys.dbms_output.put_line('Space used after shrinking: ' || l_gb || ' GB');
+end;
+/
 SQL
 
 echo "This only reclaims unused space. To also shrink the data itself, enable"
