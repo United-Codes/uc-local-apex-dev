@@ -9,11 +9,14 @@
 -- -----------------------------------------------------------------------------------
 
 -- Modified by: Philipp Hartenfeller
+-- @dblinter ignore(Core G-5010): this is a SQLcl script, dbms_output is its output
+-- @dblinter ignore(Core G-5040): a failed drop is retried in the next pass
 SET SERVEROUTPUT ON
 DECLARE
   i          NUMBER := 0;
   l_count    NUMBER;
   l_cascade  VARCHAR2(20 char);
+  l_sql      VARCHAR2(1000 char);
 BEGIN
   <<delete_iterations>>
   LOOP
@@ -30,26 +33,30 @@ BEGIN
         l_cascade := NULL;
 
         IF cur_rec.object_type = 'JOB' THEN
-          EXECUTE IMMEDIATE 'BEGIN sys.DBMS_SCHEDULER.DROP_JOB(''' || cur_rec.object_name || ''', TRUE); END;';
+          l_sql := 'BEGIN sys.DBMS_SCHEDULER.DROP_JOB(''' || cur_rec.object_name || ''', TRUE); END;';
+          EXECUTE IMMEDIATE l_sql;
           CONTINUE;
         END IF;
         --
         if cur_rec.object_type = 'PROGRAM'
         then
-           execute IMMEDIATE 'begin sys.dbms_scheduler.drop_program (program_name => '''||cur_rec.object_name||''',force => true); end;';
+           l_sql := 'begin sys.dbms_scheduler.drop_program (program_name => '''||cur_rec.object_name||''',force => true); end;';
+           execute immediate l_sql;
            continue;
         end if;
         --
         if cur_rec.object_type = 'SCHEDULE'
         then
-          execute IMMEDIATE 'begin sys.dbms_scheduler.drop_schedule (schedule_name => '''||cur_rec.object_name||''', force => true); end;';
+          l_sql := 'begin sys.dbms_scheduler.drop_schedule (schedule_name => '''||cur_rec.object_name||''', force => true); end;';
+          execute immediate l_sql;
           continue;
         end if;
         --
         IF cur_rec.object_type = 'TABLE' THEN
           l_cascade := ' CASCADE CONSTRAINTS';
         END IF;
-        EXECUTE IMMEDIATE 'DROP ' || cur_rec.object_type || ' "' || cur_rec.object_name || '"' || l_cascade;
+        l_sql := 'DROP ' || cur_rec.object_type || ' "' || cur_rec.object_name || '"' || l_cascade;
+        EXECUTE IMMEDIATE l_sql;
       EXCEPTION
         WHEN OTHERS THEN
           NULL;
@@ -61,14 +68,16 @@ BEGIN
     loop
        begin
         l_count := l_count + 1;
-        execute immediate 'begin sys.dbms_aqadm.drop_queue_table ('''||rec.queue_table||''', true); end;';
+        l_sql := 'begin sys.dbms_aqadm.drop_queue_table ('''||rec.queue_table||''', true); end;';
+        execute immediate l_sql;
        exception
        when others
        then null;
        end;
     end loop queues;
     -- Comment out the following line if you are pre-10g, or want to preserve the recyclebin contents. 
-    EXECUTE IMMEDIATE 'PURGE RECYCLEBIN';
+    l_sql := 'PURGE RECYCLEBIN';
+    EXECUTE IMMEDIATE l_sql;
     sys.DBMS_OUTPUT.put_line('Pass: ' || i || '  Drops: ' || l_count);
     EXIT delete_iterations WHEN l_count = 0 OR i >= 30;
   END LOOP delete_iterations;

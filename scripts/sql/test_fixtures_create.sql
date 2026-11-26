@@ -67,6 +67,7 @@ grant update (c) on fxb.t to fxa;
 grant execute on sys.dbms_crypto to fxa;
 grant execute on sys.dbms_lock to fxa;
 grant execute on sys.utl_http to fxa;
+-- @dblinter ignore(Core G-3145): the fixture view needs every column of the table
 create or replace view fxa.v_other as select * from fxb.t;
 grant select on fxa.t to fxb with grant option;
 grant select on fxa.t to fx_role;
@@ -214,6 +215,7 @@ prompt == public synonym over a database link
 create public synonym fx_remote for fxa.t@fx_public_link;
 
 prompt == assertions and a schema privilege (23.26)
+-- @dblinter ignore(Core G-9208): the test compares these names with the backup
 create assertion fxa.fx_assert check (not exists (select 1 from fxa.t where id < 0));
 create assertion fxa.fx_assert2 check (not exists (select 1 from fxa.t where id < -5)) deferrable initially deferred;
 grant select any table on schema fxb to fxa;

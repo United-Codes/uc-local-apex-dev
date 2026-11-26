@@ -301,6 +301,7 @@ declare
   end;
 begin
   dbms_metadata.set_transform_param(dbms_metadata.session_transform, 'SQLTERMINATOR', true);
+  -- @dblinter ignore(Core G-1920): d_filter is a SQLcl substitution variable, not PL/SQL
   for r in (&d_filter order by 1) loop
     begin emit(dbms_metadata.get_ddl('USER', r.username));
     exception when others then dbms_output.put_line('-- user ' || r.username || ': ' || sqlerrm); end;

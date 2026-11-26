@@ -20,12 +20,11 @@ end;
 
 prompt == SQL plan baseline of FXA
 select /* fx_spm_marker */ count(*) from t where id > 0;
-declare
-  n pls_integer;
 begin
+  <<plan_loop>>
   for c in (select sql_id from v$sql where sql_text like 'select /* fx_spm_marker */%' and parsing_schema_name = 'FXA') loop
-    n := dbms_spm.load_plans_from_cursor_cache(sql_id => c.sql_id);
-  end loop;
+    if sys.dbms_spm.load_plans_from_cursor_cache(sql_id => c.sql_id) >= 0 then null; end if;
+  end loop plan_loop;
 end;
 /
 exit

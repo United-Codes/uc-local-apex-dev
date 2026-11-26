@@ -47,9 +47,10 @@ exception when others then
 end;
 /
 begin
+  <<baseline_loop>>
   for b in (select distinct sql_handle from dba_sql_plan_baselines where parsing_schema_name = 'FXA') loop
     if sys.dbms_spm.drop_sql_plan_baseline(sql_handle => b.sql_handle) >= 0 then null; end if;
-  end loop;
+  end loop baseline_loop;
 end;
 /
 begin sys.dbms_sql_firewall.drop_allow_list('FXB'); end;

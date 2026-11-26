@@ -6,13 +6,13 @@
 -- Generated objects (system names for indexes, LOBs, constraints) and the
 -- DataPump master tables are left out.
 set heading off feedback off verify off pagesize 0 linesize 600 trimspool on termout on echo off
-select o.owner || '|' || o.object_type || '|' || o.object_name
+select o.owner || '|' || o.object_type || '|' || o.object_name as line
   from dba_objects o
- where o.owner in (select username from dba_users
-                    where oracle_maintained = 'N'
-                      and username not in ('ORDS_METADATA','ORDS_PUBLIC_USER','PDBADMIN','UTPLSQL')
-                      and username not like 'APEX\_%' escape '\'
-                      and username not like 'C##%')
+ where o.owner in (select u.username from dba_users u
+                    where u.oracle_maintained = 'N'
+                      and u.username not in ('ORDS_METADATA','ORDS_PUBLIC_USER','PDBADMIN','UTPLSQL')
+                      and u.username not like 'APEX\_%' escape '\'
+                      and u.username not like 'C##%')
    and o.generated = 'N'
    and o.object_name not like 'ESQL\_%' escape '\'
    and o.object_name not like 'ISQL\_%' escape '\'
@@ -27,12 +27,12 @@ union all
 -- does not show (see the domain bug in export_gaps.sql).
 select c.owner || '|DOMAIN LINK|' || c.table_name || '.' || c.column_name || '=' || c.domain_owner || '.' || c.domain_name
   from dba_tab_cols c
- where c.owner in (select username from dba_users
-                    where oracle_maintained = 'N'
-                      and username not in ('ORDS_METADATA','ORDS_PUBLIC_USER','PDBADMIN','UTPLSQL')
-                      and username not like 'APEX\_%' escape '\'
-                      and username not like 'C##%')
+ where c.owner in (select u.username from dba_users u
+                    where u.oracle_maintained = 'N'
+                      and u.username not in ('ORDS_METADATA','ORDS_PUBLIC_USER','PDBADMIN','UTPLSQL')
+                      and u.username not like 'APEX\_%' escape '\'
+                      and u.username not like 'C##%')
    and c.domain_name is not null
    and c.table_name not like 'BIN$%'
- order by 1;
+ order by line;
 exit
