@@ -23,9 +23,10 @@ package:
   stage: package
   only:
     - docs
-  image: debian:bullseye
+  image: debian:bookworm-slim
   before_script:
-    - apt-get update && apt-get install -y zip
+    - apt-get update
+    - apt-get install --no-install-recommends -y zip
   script:
   - cd public
   - zip -r ../apex-local-docs.zip ./*
