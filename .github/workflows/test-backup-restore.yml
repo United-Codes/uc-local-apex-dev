@@ -22,8 +22,10 @@ on:
         description: "Optional. DB image tag for the new database, e.g. 23.26.4.0. Empty = same image as docker-compose.yml."
         required: false
         default: ""
-  pull_request:
-    paths:
+  push:
+    branches:
+      - "26-*"
+    paths: &backup_paths
       - "scripts/backup-*.sh"
       - "scripts/import-*.sh"
       - "scripts/export-gaps.sh"
@@ -36,6 +38,8 @@ on:
       - "scripts/sql/manifest.sql"
       - "scripts/sql/test_fixtures_*.sql"
       - ".github/workflows/test-backup-restore.yml"
+  pull_request:
+    paths: *backup_paths
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
