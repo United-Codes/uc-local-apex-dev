@@ -5,7 +5,8 @@ name: Test backup and restore
 #   install.sh -> seed a schema + hand-made fixtures -> probe
 #   -> rebuild (backup-all, wipe volume, install.sh, import-all) -> probe -> compare
 #
-# With the input `target_db_image`, the rebuild installs that image instead of the
+# With `source_db_image`, the first install uses that image. With `target_db_image`,
+# the rebuild installs that image instead of the
 # pinned one. This is the "upgrade by export and import" path of a new release:
 # back up on the old database, install the new one, import.
 #
@@ -13,6 +14,10 @@ name: Test backup and restore
 on:
   workflow_dispatch:
     inputs:
+      source_db_image:
+        description: "Optional. DB image tag for the first install, e.g. 23.26.3.0. Empty = the image in docker-compose.yml."
+        required: false
+        default: ""
       target_db_image:
         description: "Optional. DB image tag for the new database, e.g. 23.26.4.0. Empty = same image as docker-compose.yml."
         required: false
@@ -47,6 +52,7 @@ jobs:
     env:
       CONTAINER_CLI: docker
       # Empty on pull_request runs.
+      SOURCE_DB_IMAGE: ${{ inputs.source_db_image || '' }}
       TARGET_DB_IMAGE: ${{ inputs.target_db_image || '' }}
 
     steps:
@@ -79,7 +85,17 @@ jobs:
           echo "$HOME/sqlcl/bin" >> "$GITHUB_PATH"
           "$HOME/sqlcl/bin/sql" -V
 
-      - name: Install the pinned version
+      - name: Point docker-compose.yml at the source image
+        run: |
+          set -euo pipefail
+          if [ -n "$SOURCE_DB_IMAGE" ]; then
+            sed -i -E "s#(image: container-registry.oracle.com/database/free:).*#\1${SOURCE_DB_IMAGE}#" docker-compose.yml
+          fi
+          # Remember the pinned image: the rebuild goes back to it if no target is set.
+          git show HEAD:docker-compose.yml | grep -oE 'database/free:[^"[:space:]]+' | head -1 | cut -d: -f2 > "$RUNNER_TEMP/pinned_image"
+          grep -n 'database/free:' docker-compose.yml
+
+      - name: Install the source version
         run: ./install.sh
 
       # RESTORE_TEST holds data and many object types (seed.sql). The fixtures
@@ -108,8 +124,8 @@ jobs:
         run: |
           set -euo pipefail
           if [ -z "$TARGET_DB_IMAGE" ]; then
-            echo "No target image. The rebuild uses the pinned image."
-            exit 0
+            TARGET_DB_IMAGE=$(cat "$RUNNER_TEMP/pinned_image")
+            echo "No target image. The rebuild uses the pinned image $TARGET_DB_IMAGE."
           fi
           sed -i -E "s#(image: container-registry.oracle.com/database/free:).*#\1${TARGET_DB_IMAGE}#" docker-compose.yml
           grep -n 'database/free:' docker-compose.yml

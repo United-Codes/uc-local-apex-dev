@@ -13,6 +13,7 @@ For a first install, see the [setup instructions](/products/uc-local-apex-dev/do
 
 ## Changes
 
+- DB 23.26.3.0 → 23.26.4.0. The datafiles are compatible. You can swap the image or move your data into a new database with export and import. See [Upgrade the Database](/products/uc-local-apex-dev/docs/migrations/upgrade-database/).
 - ORDS 26.2.2 → 26.3.1. ORDS upgrades its own schema on the first start. No action is necessary.
 - New script `scripts/create-purge-jobs.sh` (`local-26ai.sh create-purge-jobs`). It creates two scheduler jobs. Each job keeps 7 days of data.
   - `UC_APEX_DEBUG_PURGE` runs every day at 03:20. It calls `apex_debug.remove_debug_by_age` for every application. Debug messages without an application stay. APEX removes them when it rotates its debug tables. On one install the debug tables held 455MB.
@@ -43,26 +44,9 @@ For a first install, see the [setup instructions](/products/uc-local-apex-dev/do
 
 ## Migration
 
-### Update the repository
+### Upgrade the database
 
-Stop the database. The first start after the update creates the containers again:
-
-```sh
-./local-26ai.sh stop
-```
-
-Get the new release:
-
-```sh
-git fetch
-git checkout 26-5
-```
-
-Start the database and ORDS:
-
-```sh
-./local-26ai.sh start
-```
+This release changes the database image. Do one of the two procedures in [Upgrade the Database](/products/uc-local-apex-dev/docs/migrations/upgrade-database/). Use `26-5` as the new branch. Then continue here.
 
 Make sure that both containers show `healthy` or `Up`. Podman users run `podman ps`:
 

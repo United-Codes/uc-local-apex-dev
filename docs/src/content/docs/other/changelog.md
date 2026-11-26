@@ -12,6 +12,12 @@ guide. The release notes on GitHub hold the pull requests and the contributors.
 
 [Migrate to 26.5](/products/uc-local-apex-dev/docs/migrations/26-5/)
 
+### Versions
+
+- DB 23.26.3.0 → 23.26.4.0. The datafiles are compatible. A new page describes
+  the two ways to upgrade: an image swap, or export and import with `rebuild`.
+- ORDS 26.2.2 → 26.3.1.
+
 ### Purge jobs
 
 - New script `scripts/create-purge-jobs.sh` (`local-26ai.sh create-purge-jobs`).
