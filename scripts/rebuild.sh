@@ -132,12 +132,20 @@ echo "== Step 3/5: wipe the database"
 # compose down, not stop.sh: the database is about to be deleted, so a clean
 # shutdown and the space check have no value.
 $DOCKER_COMPOSE -f docker-compose.yml down
-$CONTAINER_CLI volume rm "$VOLUME"
+# ./ords-config first: if it cannot be emptied, the database still exists.
+# On Linux the ORDS container writes the files as its own user (uid 54321), so
+# a normal user cannot delete them. A throwaway ORDS container as root can.
 if ! rm -rf ./ords-config/* ./ords-config/.[!.]* 2>/dev/null; then
-  echo "Error: cannot delete the contents of ./ords-config (files of another owner)." >&2
-  echo "       Delete them with sudo, then run ./install.sh and ./local-26ai.sh import-all -y." >&2
-  exit 1
+  ORDS_IMAGE=$(grep -oE 'container-registry\.oracle\.com/database/ords:[^"[:space:]]+' docker-compose.yml | head -n1)
+  $CONTAINER_CLI run --rm --user root --entrypoint /bin/sh -v "$PWD/ords-config:/cfg" "$ORDS_IMAGE" \
+    -c 'rm -rf /cfg/* /cfg/.[!.]*' || true
+  if [ -n "$(ls -A ./ords-config 2>/dev/null)" ]; then
+    echo "Error: cannot delete the contents of ./ords-config (files of another owner)." >&2
+    echo "       Nothing was deleted. Delete them with sudo, then run rebuild again." >&2
+    exit 1
+  fi
 fi
+$CONTAINER_CLI volume rm "$VOLUME"
 
 echo ""
 echo "== Step 4/5: install a new database"
