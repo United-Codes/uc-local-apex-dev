@@ -5,7 +5,10 @@ set -e
 
 source ./scripts/util/load_env.sh
 
-sql -name "$DB_CONN_NAME" <<SQL
+# -S hides the SQLcl banner, "feedback off" hides the "Profile altered" and
+# "PL/SQL procedure successfully completed" lines. Errors still show.
+sql -S -name "$DB_CONN_NAME" <<SQL
+set feedback off
 alter profile default limit password_life_time unlimited;
 
 begin

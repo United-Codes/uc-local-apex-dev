@@ -44,9 +44,10 @@ if [[ $answer == "y" ]] || [[ $answer == "Y" ]]; then
 
   # Each statement is guarded so the script works whether or not the user /
   # tablespace still exist (e.g. a half-created schema, or a re-run).
-  sql -name "$DB_CONN_NAME" <<SQL
-    select user from dual;
-    set serveroutput on size 1000000 format wrapped
+  # -S hides the SQLcl banner, "feedback off" hides the "PL/SQL procedure
+  # successfully completed" and "Commit complete" lines.
+  sql -S -name "$DB_CONN_NAME" <<SQL
+    set serveroutput on size 1000000 format wrapped feedback off
     declare
        e_no_workspace exception;
        pragma exception_init (e_no_workspace, -20987);

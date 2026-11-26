@@ -26,16 +26,22 @@ changed_count=0
 
 while IFS= read -r -d '' file; do
     file_count=$((file_count + 1))
-    echo "Processing: ${file#$IMPORT_DIR/}"
-    
+
     # Use awk to replace the pattern
     # Match p_group_ids followed by optional spaces, =>, and any combination of numbers and colons
     awk '{
         gsub(/p_group_ids[[:space:]]*=>[[:space:]]*'"'"'[0-9:]+'"'"'/, "p_group_ids => '"'"''"'"'")
         print
-    }' "$file" > "$file.tmp" && mv "$file.tmp" "$file"
-    
-    changed_count=$((changed_count + 1))
+    }' "$file" > "$file.tmp"
+
+    # Print and count only the files that the awk call changed.
+    if cmp -s "$file" "$file.tmp"; then
+        rm "$file.tmp"
+    else
+        mv "$file.tmp" "$file"
+        echo "Fixed: ${file#$IMPORT_DIR/}"
+        changed_count=$((changed_count + 1))
+    fi
 done < <(find "$IMPORT_DIR" -type f -name "w[0-9]*.sql" -print0)
 
 echo ""

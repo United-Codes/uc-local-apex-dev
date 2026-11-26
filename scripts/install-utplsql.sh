@@ -163,8 +163,9 @@ else
 fi
 
 echo "Preparing the database"
-sql -name "$DB_CONN_NAME" <<SQL
+sql -S -name "$DB_CONN_NAME" <<SQL
 whenever sqlerror exit failure
+set feedback off
 declare
   n number;
 begin
@@ -189,11 +190,19 @@ SQL
 cd - >/dev/null
 
 echo "Checking the installation"
-sql -name "$DB_CONN_NAME" <<SQL
-set pagesize 50 linesize 160 feedback off
-select count(*) as invalid_objects from dba_objects
- where owner = '$UT_OWNER' and status <> 'VALID';
-select trigger_name, status from dba_triggers where owner = '$UT_OWNER';
+sql -S -name "$DB_CONN_NAME" <<SQL
+set feedback off serveroutput on
+begin
+  for r in (select count(*) n from dba_objects
+             where owner = '$UT_OWNER' and status <> 'VALID') loop
+    sys.dbms_output.put_line('  invalid objects: ' || r.n);
+  end loop;
+  for r in (select trigger_name, status from dba_triggers
+             where owner = '$UT_OWNER' order by trigger_name) loop
+    sys.dbms_output.put_line('  trigger ' || r.trigger_name || ': ' || r.status);
+  end loop;
+end;
+/
 exit
 SQL
 

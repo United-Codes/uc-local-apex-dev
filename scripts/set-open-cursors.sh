@@ -74,7 +74,9 @@ if [ "$current" -ge "$TARGET_OPEN_CURSORS" ]; then
   exit 0
 fi
 
-sql -name "$DB_CONN_NAME" <<SQL
+# -S and "feedback off" hide the banner and "System altered". Errors still show.
+sql -S -name "$DB_CONN_NAME" <<SQL
+set feedback off
 alter system set open_cursors = $TARGET_OPEN_CURSORS scope = both;
 SQL
 

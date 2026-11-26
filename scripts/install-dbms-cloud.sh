@@ -109,7 +109,8 @@ echo "================"
 
 
 # Network/wallet ACLs are per-PDB — grant them where DBMS_CLOUD is actually used.
-sql -name "$DB_CONN_NAME" <<EOF
+sql -S -name "$DB_CONN_NAME" <<EOF
+set feedback off
 begin
   -- Allow all hosts for HTTP/HTTP_PROXY
   sys.dbms_network_acl_admin.append_host_ace(
@@ -137,7 +138,8 @@ EOF
 
 # ssl_wallet is a database-wide property and must be set in the CDB root
 # (ORA-65040 when run from a PDB).
-sql sys/"$ORACLE_PASSWORD"@localhost:"${DB_HOST_PORT:-1521}"/FREE as SYSDBA <<EOF
+sql -S sys/"$ORACLE_PASSWORD"@localhost:"${DB_HOST_PORT:-1521}"/FREE as SYSDBA <<EOF
+set feedback off
 alter database property set ssl_wallet='file:/opt/oracle/oradata/wallets/ssl';
 
 exit
@@ -155,12 +157,26 @@ EOF'
 echo "Database restarted to apply wallet settings."
 
 # Check the result: package valid in the PDB, wallet set, ACLs present.
-sql -name "$DB_CONN_NAME" <<EOF
-set pagesize 50 linesize 160
-select object_type, status from dba_objects
- where owner = 'C##CLOUD\$SERVICE' and object_name = 'DBMS_CLOUD';
-select count(*) as host_aces from dba_host_aces where principal = 'C##CLOUD\$SERVICE';
-select count(*) as wallet_aces from dba_wallet_aces where principal = 'C##CLOUD\$SERVICE';
-select property_value as ssl_wallet from database_properties where property_name = 'SSL_WALLET';
+# One line per value instead of a table for each.
+sql -S -name "$DB_CONN_NAME" <<EOF
+set feedback off serveroutput on
+begin
+  for r in (select object_type, status from dba_objects
+             where owner = 'C##CLOUD\$SERVICE' and object_name = 'DBMS_CLOUD'
+             order by object_type) loop
+    sys.dbms_output.put_line('DBMS_CLOUD ' || lower(r.object_type) || ': ' || r.status);
+  end loop;
+  for r in (select (select count(*) from dba_host_aces
+                     where principal = 'C##CLOUD\$SERVICE') host_aces,
+                   (select count(*) from dba_wallet_aces
+                     where principal = 'C##CLOUD\$SERVICE') wallet_aces,
+                   (select max(property_value) from database_properties
+                     where property_name = 'SSL_WALLET') ssl_wallet
+              from dual) loop
+    sys.dbms_output.put_line('Host ACEs: ' || r.host_aces || ', wallet ACEs: ' ||
+      r.wallet_aces || ', SSL wallet: ' || nvl(r.ssl_wallet, '(not set)'));
+  end loop;
+end;
+/
 exit
 EOF

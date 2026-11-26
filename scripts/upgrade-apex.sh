@@ -65,8 +65,10 @@ fi
 # get workspace settings (extended session timeout, etc)
 WS_SETTINGS=$(get_ws_settings "INTERNAL")
 
-sql -name "$DB_CONN_NAME" <<SQL
-  select user from dual;
+# -S hides the SQLcl banner, "feedback off" hides the "PL/SQL procedure
+# successfully completed" and "Commit complete" lines. Errors still show.
+sql -S -name "$DB_CONN_NAME" <<SQL
+  set feedback off
 
   declare
     l_username varchar2(100) ;

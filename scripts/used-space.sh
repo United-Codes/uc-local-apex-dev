@@ -126,21 +126,25 @@ if [ "$MODE" = "quiet" ]; then
   exit $RC
 fi
 
-sql -name "$DB_CONN_NAME" <<SQL
+# -S hides the SQLcl banner, "feedback off" hides the "Session altered" and the
+# "n rows selected" lines, and a large pagesize keeps each table under one header.
+sql -S -name "$DB_CONN_NAME" <<SQL
+set feedback off pagesize 1000 serveroutput on
 -- show 9.94 rather than 9,94, matching the sample output in the documentation
 alter session set nls_numeric_characters = '.,';
 
-SELECT
-    ROUND(SUM(bytes) / 1024 / 1024 / 1024, 2) AS current_gb,
-    12 AS limit_gb,
-    ROUND((SUM(bytes) / 1024 / 1024 / 1024 / 12) * 100, 2) AS percent_of_limit,
-    CASE
-        WHEN SUM(bytes) / 1024 / 1024 / 1024 >= $CRIT_GB THEN 'CRITICAL'
-        WHEN SUM(bytes) / 1024 / 1024 / 1024 >= $WARN_GB THEN 'WARNING'
-        ELSE 'OK'
-    END AS status
-FROM dba_data_files
-;
+declare
+  l_gb  number;
+  l_pct number;
+begin
+  select round(sum(bytes) / 1024 / 1024 / 1024, 2),
+         round(sum(bytes) / 1024 / 1024 / 1024 / 12 * 100, 2)
+    into l_gb, l_pct
+    from dba_data_files;
+  sys.dbms_output.put_line('Used space: ' || to_char(l_gb, 'fm990.00') ||
+    ' GB of 12 GB (' || to_char(l_pct, 'fm990.0') || ' %). Status: $STATUS');
+end;
+/
 
   select df.tablespace_name "Tablespace",
        df.totalspace "Total MB",
@@ -246,6 +250,7 @@ select nvl(a.workspace, 'security group ' || f.sgid) "Workspace",
  fetch first $DETAIL_TOP_N rows only;
 SQL
 
+echo ""
 echo "Run the shrink-space script to reclaim unused space across all tablespaces."
 echo "To also make a single schema's data smaller, run: compress-space <schema>"
 echo "To stop one file from growing without a limit, run: cap-tablespaces --check"

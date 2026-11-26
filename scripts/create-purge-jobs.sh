@@ -8,7 +8,10 @@ set -e
 # It is safe to run again: the SQL drops each job before it creates it.
 source ./scripts/util/load_env.sh
 
-sql -name "$DB_CONN_NAME" <<SQL
+# -S hides the SQLcl banner, "feedback off" hides the "PL/SQL procedure
+# successfully completed" lines. The job lines and the failures stay.
+sql -S -name "$DB_CONN_NAME" <<SQL
+set feedback off
 @./scripts/sql/create_purge_jobs.sql
 
 begin

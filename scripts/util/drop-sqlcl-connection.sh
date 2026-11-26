@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-sql /nolog <<SQL
+sql -S /nolog <<SQL
   connmgr delete -conn "${DB_CONN_BASE}-${USERNAME_LOWER}"
   exit;
 SQL

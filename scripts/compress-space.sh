@@ -82,13 +82,25 @@ if [[ $answer != "y" ]] && [[ $answer != "Y" ]]; then
   exit 0
 fi
 
-sql -name "$DB_CONN_NAME" <<SQL
-set serveroutput on size unlimited
+# -S hides the SQLcl banner and "feedback off" hides the "PL/SQL procedure
+# successfully completed" lines. Every object that changed or failed still gets
+# one line.
+sql -S -name "$DB_CONN_NAME" <<SQL
+set serveroutput on size unlimited feedback off
 
-prompt Tablespace usage before compression:
-select round((select sum(bytes) from dba_segments   where tablespace_name = '$TBS')/1024/1024, 1) as used_mb,
-       round((select sum(bytes) from dba_data_files where tablespace_name = '$TBS')/1024/1024, 1) as allocated_mb
-  from dual;
+declare
+  l_used  number;
+  l_alloc number;
+begin
+  select round(nvl(sum(bytes), 0)/1024/1024, 1) into l_used
+    from dba_segments where tablespace_name = '$TBS';
+  select round(sum(bytes)/1024/1024, 1) into l_alloc
+    from dba_data_files where tablespace_name = '$TBS';
+  sys.dbms_output.put_line('Tablespace usage before compression: ' ||
+    to_char(l_used, 'fm999990.0') || ' MB used, ' ||
+    to_char(l_alloc, 'fm999990.0') || ' MB allocated');
+end;
+/
 
 prompt Setting tablespace compression defaults:
 
@@ -167,11 +179,29 @@ end;
 
 prompt Compacting segments (dbms_space.shrink_tablespace):
 
+-- shrink_tablespace prints a long result block through dbms_output. Read it
+-- back with get_lines and keep only the "Failed" lines, as shrink-space.sh does.
+declare
+  l_lines sys.dbms_output.chararr;
+  l_n     integer := 1000;
+  l_skip  varchar2(600 char);
 begin
-  dbms_space.shrink_tablespace('$TBS');
-  dbms_output.put_line('shrank tablespace $TBS');
-exception when others then
-  dbms_output.put_line('skip shrink $TBS: '||sqlerrm);
+  begin
+    dbms_space.shrink_tablespace('$TBS');
+  exception when others then
+    l_skip := 'skip shrink $TBS: '||sqlerrm;
+  end;
+  sys.dbms_output.get_lines(l_lines, l_n);
+  for i in 1 .. l_n loop
+    if l_lines(i) like 'Failed%' then
+      sys.dbms_output.put_line('  '||trim(l_lines(i)));
+    end if;
+  end loop;
+  if l_skip is not null then
+    sys.dbms_output.put_line(l_skip);
+  else
+    sys.dbms_output.put_line('shrank tablespace $TBS');
+  end if;
 end;
 /
 
@@ -183,8 +213,8 @@ SQL
 # Non-destructive: Oracle raises ORA-03297 if the target would truncate used data,
 # so a too-small size is rejected (caught below) rather than losing anything. We
 # re-read the HWM on each of a few attempts in case DML nudges it up between tries.
-sql -name "$DB_CONN_NAME" <<SQL
-set serveroutput on size unlimited
+sql -S -name "$DB_CONN_NAME" <<SQL
+set serveroutput on size unlimited feedback off
 
 prompt Resizing datafiles down to their high-water mark:
 
@@ -234,10 +264,19 @@ begin
 end;
 /
 
-prompt Tablespace usage after compression:
-select round((select sum(bytes) from dba_segments   where tablespace_name = '$TBS')/1024/1024, 1) as used_mb,
-       round((select sum(bytes) from dba_data_files where tablespace_name = '$TBS')/1024/1024, 1) as allocated_mb
-  from dual;
+declare
+  l_used  number;
+  l_alloc number;
+begin
+  select round(nvl(sum(bytes), 0)/1024/1024, 1) into l_used
+    from dba_segments where tablespace_name = '$TBS';
+  select round(sum(bytes)/1024/1024, 1) into l_alloc
+    from dba_data_files where tablespace_name = '$TBS';
+  sys.dbms_output.put_line('Tablespace usage after compression: ' ||
+    to_char(l_used, 'fm999990.0') || ' MB used, ' ||
+    to_char(l_alloc, 'fm999990.0') || ' MB allocated');
+end;
+/
 
 exit;
 SQL

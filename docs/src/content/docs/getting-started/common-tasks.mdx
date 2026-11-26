@@ -59,10 +59,7 @@ The Free edition of the database has a space limit of 12GB. Show the used space 
 ```bash
 local-26ai.sh used-space
 
-#    CURRENT_GB    LIMIT_GB    PERCENT_OF_LIMIT STATUS
-# _____________ ___________ ___________________ _________
-#          5.04          12               41.97 OK
-
+# Used space: 5.04 GB of 12 GB (42.0 %). Status: OK
 
 # Tablespace                 Total MB    Used MB    Free MB    Pct. Free
 # _______________________ ___________ __________ __________ ____________
@@ -74,7 +71,7 @@ local-26ai.sh used-space
 # TBS_AOP                          77          7         70           91
 ```
 
-The `STATUS` column shows `WARNING` above 9.5GB and `CRITICAL` above 11GB. The
+The status is `WARNING` above 9.5GB and `CRITICAL` above 11GB. The
 command also gives the same answer as an exit code, so a script can use it:
 
 | Exit code | Meaning |
@@ -184,15 +181,9 @@ local-26ai.sh compress-space movies
 # Skip the confirmation prompt with -y:
 local-26ai.sh compress-space movies -y
 
-# Tablespace usage before compression:
-#    USED_MB    ALLOCATED_MB
-# __________ _______________
-#     1000.8            2100
+# Tablespace usage before compression: 1000.8 MB used, 2100.0 MB allocated
 # ...
-# Tablespace usage after compression:
-#    USED_MB    ALLOCATED_MB
-# __________ _______________
-#      595.6           749.7
+# Tablespace usage after compression: 595.6 MB used, 749.7 MB allocated
 ```
 
 <Aside type="note">
