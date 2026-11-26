@@ -7,6 +7,14 @@ sidebar:
 
 You don't depend on any changes to this project to upgrade APEX. As soon as an update is available, you can follow these steps to upgrade APEX in your local environment.
 
+## Before you start
+
+The upgrade needs free space. Run `shrink-space` first to reclaim unused space in the tablespaces:
+
+```sh
+./local-26ai.sh shrink-space
+```
+
 ## Versions >= 26.2: use the upgrade script
 
 Starting with version 26.2, this project ships a `scripts/upgrade-apex.sh` script that automates downloading the latest APEX, running the installer, copying the images, and reapplying the `INTERNAL` workspace settings (extended session timeout, ACLs, etc.).

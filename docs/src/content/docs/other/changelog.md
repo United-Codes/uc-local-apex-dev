@@ -8,6 +8,89 @@ sidebar:
 This page lists the changes of each release. Every entry links to its migration
 guide. The release notes on GitHub hold the pull requests and the contributors.
 
+## 26.5
+
+[Migrate to 26.5](/products/uc-local-apex-dev/docs/migrations/26-5/)
+
+### Versions
+
+- DB 23.26.3.0 → 23.26.4.0. The datafiles are compatible. A new page describes
+  the two ways to upgrade: an image swap, or export and import with `rebuild`.
+- ORDS 26.2.2 → 26.3.1.
+
+### Purge jobs
+
+- New script `scripts/create-purge-jobs.sh` (`local-26ai.sh create-purge-jobs`).
+  It creates the jobs `UC_APEX_DEBUG_PURGE` and `UC_LOGGER_PURGE`. Each job keeps
+  7 days of data. `after-first-db-start.sh` creates both jobs on a new install.
+  `UC_LOGGER_PURGE` also shrinks the `LOGGER_LOGS` tables after the delete. Run
+  `create-purge-jobs` again to update an existing job.
+
+### Shrink space
+
+- `shrink-space` rebuilds bloated tables. A delete does not lower the high-water mark of a table.
+  For a table with a segment of 50MB or more, `shrink-space` compares estimated row
+  storage with the segment size. If the estimate is less than half the segment
+  size, the command treats the table as bloated.
+  The command lists these tables and asks before it rebuilds them. With `--auto`, it does not ask.
+  It runs `alter table ... move online` and rebuilds the indexes online. Tables of Oracle-maintained
+  schemas, partitioned tables, and tables with a domain or vector index stay as they are.
+
+### Backup and restore
+
+- New script `scripts/export-gaps.sh` (`local-26ai.sh export-gaps`). It shows what
+  a schema export does not carry and writes `00_pre.sql` and `10_post.sql` with the roles, the
+  grants beyond `create-user.sh`, and the public synonyms. `backup-all` runs it.
+  `import-all` runs the SQL files.
+- The SQL files also restore scheduler windows, Resource Manager plans, editions,
+  proxy users, default roles, and wallet access entries. `export-gaps` copies the
+  files of custom directories into the backup.
+- The SQL files restore assertions and schema privileges (`grant ... on schema`).
+  `10_post.sql` clears leftover assertion helper tables before it creates the assertions.
+  `export-gaps` writes the Select AI profiles to `ai_profiles.sql`. Run each block as the profile owner.
+- `export-gaps` lists what no backup holds: secrets, objects in other editions, SQL
+  plan baselines, and SQL Firewall allow lists.
+- `import-all` compares object names and column domain links with the backup.
+  If an expected entry is missing, the command exits with code `1`.
+- `import-all` sets the vector memory of the old database and creates SQL domains
+  whose DataPump DDL is broken. `rebuild` installs DBMS_CLOUD and utPLSQL if the
+  old database had them.
+- `backup-user` shows the tables whose rows DataPump skipped and adds them to
+  `unrecoverable.txt`.
+- `export-gaps` writes the SQL for Deep Data Security data roles, end users, and
+  data grants. `import-all` runs it. End users come back locked with a random password.
+  DataPump imports data grants, but they do not work. For this reason, the import
+  leaves out the `XS_SECURITY` objects, and `10_post.sql` creates the data grants
+  again. Related-table grants (`WHEN ... GRANTED ON`) are not restored.
+- `backup-user` exports the ORDS definitions as `SYS`. A schema that is not in
+  `.env` gets a temporary password only for the APEX export and the ORDS import.
+- The backup and the import work for schema-only accounts (`no authentication`).
+- New script `scripts/rebuild.sh` (`local-26ai.sh rebuild`). It backs up the
+  database and shows the restore gaps before it asks for confirmation. It then
+  deletes the database volume, installs a new database, and imports the backup.
+- `import-all` has the options `-y` and `-j N`. `-j N` runs the DataPump import of
+  N schemas at the same time.
+- `backup-user` and `import-backup` copy only the files of their own schema.
+- `import-backup` skips a workspace that exists already. It tries failed
+  applications again, and it removes a subscription to a master that is in no backup.
+- `docker-compose.yml` reads the container name, the volume name, and the host ports
+  from `.env`.
+
+### JVM fix
+
+- New script `scripts/fix-jvm.sh` (`local-26ai.sh fix-jvm`). It tests the
+  in-database JVM and reloads it if it is broken.
+
+### utPLSQL
+
+- New script `scripts/install-utplsql.sh` (`local-26ai.sh install-utplsql`). It
+  installs or upgrades utPLSQL in the schema `UTPLSQL`.
+
+### Space report
+
+- `used-space.sh` lists the 10 largest segments of every tablespace with 1GB or
+  more of used space. It also lists the APEX file content per application.
+
 ## 26.4
 
 [Migrate to 26.4](/products/uc-local-apex-dev/docs/migrations/26-4/)
@@ -15,24 +98,14 @@ guide. The release notes on GitHub hold the pull requests and the contributors.
 ### Versions
 
 - DB 23.26.2.0 → 23.26.3.0. The datafiles are compatible, so no dump and restore
-  is necessary. The data dictionary needs one repair command.
+  is necessary. The data dictionary does not upgrade automatically.
 - ORDS 26.1.2 → 26.2.2. ORDS upgrades its own schema on the first start.
 
-### Data dictionary repair
+### DBMS_CLOUD upgrade
 
-- New script `scripts/repair-ru-dictionary.sh`
-  (`local-26ai.sh repair-ru-dictionary`). A change of the database image does not
-  upgrade the data dictionary. The database keeps the dictionary of the release
-  update that created it, and the in-database JVM stops working without a
-  message. The script finds the dictionary views that are missing, reloads the
-  catalog scripts that create them, and reloads the JVM.
-- `--check` shows the gap. `--repair` closes it. `--summary` gives `key=value`
-  lines for CI.
-- One run repairs every release update that your database missed, not only the
-  newest one.
-- `test-db-upgrade.yml` now also proves the repair. The workflow changes the
-  image on the same datafiles, runs the repair, and makes sure that the data,
-  APEX and the dictionary are complete after it.
+- New script `scripts/upgrade-dbms-cloud.sh` (`local-26ai.sh upgrade-dbms-cloud`).
+  A change of the database image does not upgrade `DBMS_CLOUD`. The script
+  reloads the packages. It stops with an error if `DBMS_CLOUD` is not installed.
 
 ### Space management
 
@@ -89,6 +162,11 @@ guide. The release notes on GitHub hold the pull requests and the contributors.
 - `backup-all.sh` resolves the workspace of a schema correctly. It deletes the
   Data Pump master tables that it creates, because they made every later dump
   larger. It reports a failure through the exit code.
+- `import-datapump.sh` gains `-rt <old>=<new>`. The flag remaps the tablespaces
+  of the dump. Without it, a dump from another database fails on every table
+  with `ORA-00959`.
+- `import-backup.sh` gives `-rs` and the new `-rt` to `import-datapump.sh`
+  correctly. Earlier, `import-backup.sh <name> -rs <schema>` ignored the remap.
 
 ### Other scripts
 

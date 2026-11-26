@@ -3,6 +3,17 @@
 
 set -e
 
+# --auto answers the questions without a prompt: purge the audit records (yes)
+# and drop old APEX schemas (no). stop.sh uses it. A run without a terminal
+# behaves the same way.
+AUTO=false
+for arg in "$@"; do
+  case "$arg" in
+    --auto) AUTO=true ;;
+    *) echo "Unknown option: $arg (supported: --auto)" >&2; exit 1 ;;
+  esac
+done
+
 source ./scripts/util/load_env.sh
 
 # The AUDIT_TRAIL datafile grows to several GB and never shrinks back. The cost is
@@ -35,7 +46,7 @@ source ./scripts/util/load_env.sh
 # nothing to purge does not abort the rest. Note the unified trail needs no
 # cleanup initialisation: dbms_audit_mgmt.init_cleanup carries pragma deprecate,
 # and is_cleanup_initialized raises ORA-46259 for UNIFIED_AUDIT_TRAIL.
-if [ -t 0 ]; then
+if [ "$AUTO" != "true" ] && [ -t 0 ]; then
   read -r -p "Purge audit records first (deletes audit history, frees audit data)? [Y/n] " purge_ans
 else
   purge_ans="Y"
@@ -45,8 +56,8 @@ if [[ $purge_ans == "n" ]] || [[ $purge_ans == "N" ]]; then
   echo "Skipping audit purge."
 else
   echo "Purging audit records..."
-  sql -name "$DB_CONN_NAME" <<SQL
-set serveroutput on
+  sql -S -name "$DB_CONN_NAME" <<SQL
+set serveroutput on feedback off
 begin
   dbms_audit_mgmt.set_last_archive_timestamp(
     audit_trail_type  => dbms_audit_mgmt.audit_trail_unified,
@@ -68,8 +79,13 @@ begin
     audit_trail_type        => dbms_audit_mgmt.audit_trail_aud_std,
     use_last_arch_timestamp => true);
   dbms_output.put_line('aud_std purge done');
-exception when others then
-  dbms_output.put_line('aud_std purge skipped: '||sqlerrm);
+exception
+  when others then
+    if sqlcode = -46258 then
+      dbms_output.put_line('aud_std: nothing to purge (legacy trail not in use)');
+    else
+      dbms_output.put_line('aud_std purge skipped: '||sqlerrm);
+    end if;
 end;
 /
 
@@ -81,8 +97,13 @@ begin
     audit_trail_type        => dbms_audit_mgmt.audit_trail_fga_std,
     use_last_arch_timestamp => true);
   dbms_output.put_line('fga_std purge done');
-exception when others then
-  dbms_output.put_line('fga_std purge skipped: '||sqlerrm);
+exception
+  when others then
+    if sqlcode = -46258 then
+      dbms_output.put_line('fga_std: nothing to purge (legacy trail not in use)');
+    else
+      dbms_output.put_line('fga_std purge skipped: '||sqlerrm);
+    end if;
 end;
 /
 SQL
@@ -119,11 +140,11 @@ if [ -z "$OLD_APEX" ]; then
 else
   echo "Found old APEX schema(s):"
   echo "$OLD_APEX" | sed 's/^/  /'
-  if [ -t 0 ]; then
+  if [ "$AUTO" != "true" ] && [ -t 0 ]; then
     read -r -p "Drop old APEX schema(s) above with CASCADE (irreversible)? [y/N] " drop_ans
   else
     drop_ans="N"
-    echo "Non-interactive mode: skipping old APEX drop for safety."
+    echo "Non-interactive or --auto mode: skipping old APEX drop for safety."
   fi
 
   if [[ $drop_ans == "y" ]] || [[ $drop_ans == "Y" ]]; then
@@ -150,6 +171,43 @@ SQL
   fi
 fi
 
+# Tier 2b: rebuild bloated tables (non-destructive).
+# A delete does not lower the high-water mark of a table. A log table that once
+# held millions of rows keeps its whole segment after a purge, and shrink_tablespace
+# cannot compact it. scripts/sql/rebuild_bloated_tables.sql finds such tables
+# (segment of 50 MB or more, live rows below half of it) and rebuilds them with
+# "alter table ... move online" plus an online rebuild of their indexes.
+# The prompt defaults to yes, because the rebuild loses no data. Without a terminal
+# or with --auto, the rebuild runs without a prompt.
+echo "Looking for bloated tables..."
+BLOATED=$(sql -S -name "$DB_CONN_NAME" 2>/dev/null <<'SQL' | grep '^###' | sed 's/^###//'
+define MODE=list
+@./scripts/sql/rebuild_bloated_tables.sql
+SQL
+)
+
+if [ -z "$BLOATED" ]; then
+  echo "No bloated tables found."
+else
+  echo "Found bloated tables (segment size against the size of the live rows):"
+  echo "$BLOATED" | sed 's/^/  /'
+  if [ "$AUTO" != "true" ] && [ -t 0 ]; then
+    read -r -p "Rebuild these tables (online, no data is lost)? [Y/n] " rebuild_ans
+  else
+    rebuild_ans="Y"
+  fi
+
+  if [[ $rebuild_ans == "n" ]] || [[ $rebuild_ans == "N" ]]; then
+    echo "Skipping table rebuild."
+  else
+    echo "Rebuilding tables..."
+    sql -S -name "$DB_CONN_NAME" <<'SQL'
+define MODE=run
+@./scripts/sql/rebuild_bloated_tables.sql
+SQL
+  fi
+fi
+
 # Tier 3: reclaim space (non-destructive), in three steps:
 #   1. SHRINK SPACE the FLOWS_FILES LOB to release dead space into the tablespace.
 #   2. dbms_space.shrink_tablespace to compact segments.
@@ -165,14 +223,21 @@ fi
 # reclaim it. Shrinking the LOB releases that space back into TBS_APEX first, then
 # the tablespace shrink resizes the datafile down. LOB shrink is online and
 # non-destructive (it compacts, never deletes live content).
-sql -name "$DB_CONN_NAME" <<SQL
-set serveroutput on
+# The output stays short: -S hides the SQLcl banner, "feedback off" hides the
+# "PL/SQL procedure successfully completed" lines, and the tablespace loop keeps
+# only one line per tablespace that changed. shrink_tablespace prints a block per
+# call through dbms_output. The loop reads that output back with get_lines and
+# keeps only the "Failed" lines.
+sql -S -name "$DB_CONN_NAME" <<SQL
+set serveroutput on size unlimited feedback off
 
-prompt Space usage before shrinking:
-SELECT
-    ROUND(SUM(bytes) / 1024 / 1024 / 1024, 2) AS current_gb
-FROM dba_data_files
-;
+declare
+  l_gb number;
+begin
+  select round(sum(bytes) / 1024 / 1024 / 1024, 2) into l_gb from dba_data_files;
+  sys.dbms_output.put_line('Space used before shrinking: ' || l_gb || ' GB');
+end;
+/
 
 prompt Shrinking FLOWS_FILES LOB:
 
@@ -188,9 +253,9 @@ begin
     begin
       execute immediate 'ALTER TABLE "'||rec.owner||'"."'||rec.table_name||
         '" MODIFY LOB ("'||rec.column_name||'") (SHRINK SPACE)';
-      dbms_output.put_line('shrank lob '||rec.table_name||'.'||rec.column_name);
+      dbms_output.put_line('  shrank lob '||rec.table_name||'.'||rec.column_name);
     exception when others then
-      dbms_output.put_line('skip lob '||rec.table_name||'.'||rec.column_name||': '||sqlerrm);
+      dbms_output.put_line('  skip lob '||rec.table_name||'.'||rec.column_name||': '||sqlerrm);
     end;
   end loop;
 end;
@@ -198,6 +263,21 @@ end;
 
 prompt Shrinking tablespaces:
 
+declare
+  type l_out_t is table of varchar2(600 char);
+  l_out       l_out_t := l_out_t();
+  l_lines     sys.dbms_output.chararr;
+  l_n         integer;
+  l_before    number;
+  l_after     number;
+  l_unchanged pls_integer := 0;
+  l_failures  l_out_t;
+
+  procedure add_line(p_line in varchar2) is
+  begin
+    l_out.extend;
+    l_out(l_out.last) := p_line;
+  end add_line;
 begin
   for rec in (
     select tablespace_name
@@ -207,12 +287,44 @@ begin
         or tablespace_name = 'AUDIT_TRAIL'
   )
   loop
+    l_failures := l_out_t();
+    select sum(bytes) into l_before from dba_data_files
+     where tablespace_name = rec.tablespace_name;
+
     begin
       dbms_space.shrink_tablespace(rec.tablespace_name);
     exception when others then
-      dbms_output.put_line('skip '||rec.tablespace_name||': '||sqlerrm);
+      l_failures.extend;
+      l_failures(l_failures.last) := '  skip: ' || sqlerrm;
     end;
+
+    select sum(bytes) into l_after from dba_data_files
+     where tablespace_name = rec.tablespace_name;
+
+    l_n := 1000;
+    sys.dbms_output.get_lines(l_lines, l_n);
+    for i in 1 .. l_n loop
+      if l_lines(i) like 'Failed%' then
+        l_failures.extend;
+        l_failures(l_failures.last) := '  ' || trim(l_lines(i));
+      end if;
+    end loop;
+
+    if l_before - l_after >= 1024 * 1024 or l_failures.count > 0 then
+      add_line(rpad(rec.tablespace_name, 24) || lpad(round(l_before / 1024 / 1024), 6) ||
+        ' MB -> ' || lpad(round(l_after / 1024 / 1024), 6) || ' MB');
+      for i in 1 .. l_failures.count loop
+        add_line(l_failures(i));
+      end loop;
+    else
+      l_unchanged := l_unchanged + 1;
+    end if;
   end loop;
+
+  for i in 1 .. l_out.count loop
+    sys.dbms_output.put_line(l_out(i));
+  end loop;
+  sys.dbms_output.put_line(l_unchanged || ' tablespaces had nothing to shrink.');
 end;
 /
 SQL
@@ -229,8 +341,8 @@ SQL
 # Non-destructive: Oracle raises ORA-03297 if the target would truncate used
 # data, so a too-small size is rejected (caught below), never lossy. We re-read
 # the HWM on each of a few attempts in case concurrent DML nudges it up.
-sql -name "$DB_CONN_NAME" <<SQL
-set serveroutput on
+sql -S -name "$DB_CONN_NAME" <<SQL
+set serveroutput on feedback off
 
 prompt Resizing datafiles down to their high-water mark:
 
@@ -286,11 +398,13 @@ begin
 end;
 /
 
-prompt Space usage after shrinking:
-SELECT
-    ROUND(SUM(bytes) / 1024 / 1024 / 1024, 2) AS current_gb
-FROM dba_data_files
-;
+declare
+  l_gb number;
+begin
+  select round(sum(bytes) / 1024 / 1024 / 1024, 2) into l_gb from dba_data_files;
+  sys.dbms_output.put_line('Space used after shrinking: ' || l_gb || ' GB');
+end;
+/
 SQL
 
 echo "This only reclaims unused space. To also shrink the data itself, enable"

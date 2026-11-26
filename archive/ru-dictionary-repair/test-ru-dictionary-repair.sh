@@ -30,6 +30,13 @@
 # needed three fixes in repair-ru-dictionary.sh first -- the AWR base tables,
 # the multi-pass convergence, and one session per component revalidation.
 #
+# Verified on 2026-11-22 for 23.26.3 -> 23.26.4 (22 of 68 probed views missing):
+# missing_repairable=0, jvm_ok=yes, 0 invalid objects, fingerprint unchanged,
+# assertions enforcing. It needed four fixes in repair-ru-dictionary.sh first --
+# catadvtb.sql before catadv.sql (ADDM rule tables), the NEW_PKG_SCRIPTS step
+# (DBMS_WRR_STATE, DBMS_SNAP_INTERNAL), and running that step again after the
+# view scripts because c21.sql drops DBMS_WRR_STATE.
+#
 # When a new RU ships, add its new view names to NEW_VIEWS_<RU> in
 # scripts/repair-ru-dictionary.sh first, then run this against the new pair.
 set -uo pipefail

@@ -150,6 +150,9 @@ exception when others then
 end;
 /
 
+-- Purge jobs for APEX debug messages and Logger. The SQL file has the details.
+@./scripts/sql/create_purge_jobs.sql
+
 create bigfile tablespace tbs_apex
   datafile 'tbs_apex.dbf'
   size 20m

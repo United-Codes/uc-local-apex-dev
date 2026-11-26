@@ -1,0 +1,70 @@
+---
+title: utPLSQL
+description: Run unit tests for your PL/SQL code in your local APEX development database.
+sidebar:
+  order: 6
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+[utPLSQL](https://github.com/utPLSQL/utPLSQL) runs unit tests for PL/SQL code inside the database. For example, a test can call a function and compare its return value with the expected value. utPLSQL reports which tests pass or fail.
+
+You write tests in PL/SQL packages. utPLSQL finds the tests through special comments called annotations.
+
+## Install utPLSQL
+
+Make sure that the database is running. Then install the latest release:
+
+```bash
+local-26ai.sh install-utplsql
+```
+
+The command downloads `utPLSQL.zip` from GitHub. If the release has a checksum file, the command compares the checksum of the download. It saves a random password as `UTPLSQL_USER_PASSWORD` in `.env`. If this entry exists, the command uses it.
+
+The command installs the framework in the `UTPLSQL` schema and creates the `TBS_UTPLSQL` tablespace if necessary. It also installs a database trigger.
+
+When you compile a test package, the trigger reads its annotations. Tests then start faster in schemas with many packages. The trigger skips schemas that Oracle maintains.
+
+## Run your tests
+
+The installer grants access to utPLSQL so you can run tests directly from your application schema.
+
+Connect to the schema that contains your tests. Run this query to see the results.
+
+```sql
+select * from table(ut.run());
+```
+
+For an example of how to write a test, see the [utPLSQL getting started guide](https://www.utplsql.org/utPLSQL/latest/userguide/getting-started.html).
+
+## Upgrade or reinstall utPLSQL
+
+The same command upgrades utPLSQL to the latest release. If that version is already installed, the command stops and changes nothing.
+
+<Aside type="caution" title="install-utplsql drops the UTPLSQL schema">
+  Before you run `install-utplsql`, back up the objects that you created in
+  `UTPLSQL`.
+  For an upgrade, a downgrade, or `--force`, `install-utplsql` drops the schema
+  `UTPLSQL` and its objects. It drops every public synonym that points to
+  `UTPLSQL`, including synonyms that you created. The command keeps the
+  `TBS_UTPLSQL` tablespace.
+</Aside>
+
+Run the install command again to upgrade:
+
+```bash
+local-26ai.sh install-utplsql
+```
+
+| Option      | Description                                                                                                          |
+| ----------- | -------------------------------------------------------------------------------------------------------------------- |
+| `<version>` | Installs a specific release, including older releases. For version 3.2.2, use `local-26ai.sh install-utplsql 3.2.2`. |
+| `--force`   | If the requested version is already installed, this option reinstalls it.                                            |
+
+## Show the installed version
+
+Run this query from your application schema:
+
+```sql
+select ut.version from dual;
+```

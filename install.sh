@@ -208,7 +208,13 @@ source ./scripts/util/load_env.sh
 # 3. Pull images
 # ---------------------------------------------------------------------------
 banner "Pull container images"
-$DOCKER_COMPOSE pull
+if ! $DOCKER_COMPOSE pull; then
+  echo "" >&2
+  echo "Image pull failed. If the error says 'unauthorized', a stale login for" >&2
+  echo "container-registry.oracle.com is the likely cause. Run this command and try again:" >&2
+  echo "  $CONTAINER_CLI logout container-registry.oracle.com" >&2
+  exit 1
+fi
 
 # ---------------------------------------------------------------------------
 # 4. Start the stack
@@ -295,7 +301,7 @@ banner "Verify host database connection"
 deadline=$((SECONDS + 120))
 db_conn_ok=false
 while (( SECONDS < deadline )); do
-  conn_out=$(sql -S "sys/${ORACLE_PASSWORD}@localhost:1521/FREEPDB1" as SYSDBA <<'SQL' 2>&1 || true
+  conn_out=$(sql -S "sys/${ORACLE_PASSWORD}@localhost:${DB_HOST_PORT:-1521}/FREEPDB1" as SYSDBA <<'SQL' 2>&1 || true
 set heading off feedback off pagesize 0
 select 1 from dual;
 exit
@@ -317,7 +323,7 @@ done
 if [ "$db_conn_ok" != true ]; then
   echo "Last SQLcl output:" >&2
   printf '%s\n' "$conn_out" >&2
-  fail_resumable "cannot connect to the database from this host (sys@localhost:1521/FREEPDB1).
+  fail_resumable "cannot connect to the database from this host (sys@localhost:${DB_HOST_PORT:-1521}/FREEPDB1).
 Check that SQLcl ('sql') and its Java runtime work and that nothing else occupies port 1521."
 fi
 
@@ -337,7 +343,7 @@ banner "Run after-first-db-start.sh (installs APEX, applies space optimizations)
 # and skip the step so a re-run of install.sh genuinely "picks up where it left
 # off". The versioned APEX schema (e.g. APEX_260100) exists only after apexins.sql
 # has run, so its presence is a reliable "already installed" signal.
-apex_installed=$(sql -S "sys/${ORACLE_PASSWORD}@localhost:1521/FREEPDB1" as SYSDBA <<'SQL' 2>/dev/null | grep -oE '[0-9]+' | head -1 || true
+apex_installed=$(sql -S "sys/${ORACLE_PASSWORD}@localhost:${DB_HOST_PORT:-1521}/FREEPDB1" as SYSDBA <<'SQL' 2>/dev/null | grep -oE '[0-9]+' | head -1 || true
 set heading off feedback off pagesize 0
 select count(*) from dba_users where regexp_like(username, '^APEX_[0-9]+$');
 exit
@@ -352,11 +358,29 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# 7b. Raise open_cursors for large APEX imports
+# ---------------------------------------------------------------------------
+# The Free image gives FREEPDB1 open_cursors=300, which is a handful of cursors
+# below what the SQLcl APEXlang importer needs for a mid-size application. The
+# result is an `apex import` that fails at random with ORA-01000, and the error
+# names the application instead of the setting. See the script header for the
+# measurements.
+#
+# This runs on EVERY install, not only a fresh one: step 7 is skipped once APEX
+# exists, and an installation made before this step still carries the old 300.
+# The script raises the value only when the current value is lower, so a re-run
+# and a hand-raised ceiling both stay untouched. The change is immediate, so it
+# needs no restart. It must stay after step 7, which saves the SYS connection
+# that the script uses.
+banner "Raise open_cursors for APEX imports"
+./scripts/set-open-cursors.sh
+
+# ---------------------------------------------------------------------------
 # 8. Wait for ORDS to finish its first-boot install
 # ---------------------------------------------------------------------------
 banner "Wait for ORDS to be ready (up to 15 minutes)"
 ords_query() {
-  sql -S "sys/${ORACLE_PASSWORD}@localhost:1521/FREEPDB1" as SYSDBA <<'SQL'
+  sql -S "sys/${ORACLE_PASSWORD}@localhost:${DB_HOST_PORT:-1521}/FREEPDB1" as SYSDBA <<'SQL'
 set heading off feedback off pagesize 0
 select count(*) from dba_synonyms
  where owner = 'PUBLIC' and synonym_name = 'ORDS';
@@ -376,10 +400,10 @@ while (( SECONDS < deadline )); do
   fi
   # A dead ORDS container will never finish installing -- fail fast instead
   # of burning the whole timeout.
-  running=$($CONTAINER_CLI inspect -f '{{.State.Running}}' local-26ai-ords 2>/dev/null || true)
+  running=$($CONTAINER_CLI inspect -f '{{.State.Running}}' "${CONTAINER_NAME:-local-26ai}-ords" 2>/dev/null || true)
   if [ "$running" != "true" ]; then
     $DOCKER_COMPOSE logs ords-26ai 2>/dev/null | tail -200 >&2 || true
-    fail_resumable "the ORDS container (local-26ai-ords) is not running"
+    fail_resumable "the ORDS container (${CONTAINER_NAME:-local-26ai}-ords) is not running"
   fi
   if (( SECONDS >= progress_at )); then
     echo "Still waiting for the ORDS first-boot install... ($(( (SECONDS - wait_start) / 60 ))/15 min)"
@@ -404,7 +428,7 @@ fi
 # workspace-level proxy auth in all cases. The command is idempotent. It must
 # stay after the ORDS wait so the first-boot installer cannot overwrite it.
 banner "Configure ORDS plsql.gateway.mode = proxied"
-$CONTAINER_CLI exec local-26ai-ords bash -c \
+$CONTAINER_CLI exec "${CONTAINER_NAME:-local-26ai}-ords" bash -c \
   "ords --config /etc/ords/config config --db-pool default set plsql.gateway.mode proxied"
 
 # ---------------------------------------------------------------------------
@@ -425,7 +449,7 @@ $CONTAINER_CLI exec local-26ai-ords bash -c \
 #     boot.
 if [ "$SECURE" = true ]; then
   banner "Secure mode: disable ORDS Database API, SQL Developer Web / Database Actions"
-  $CONTAINER_CLI exec local-26ai-ords bash -c '
+  $CONTAINER_CLI exec "${CONTAINER_NAME:-local-26ai}-ords" bash -c '
     set -e
     ords --config /etc/ords/config config set database.api.enabled false
     ords --config /etc/ords/config config --db-pool default set feature.sdw false
@@ -443,7 +467,7 @@ while (( SECONDS < deadline )); do
   # Capture then match (no pipe into grep) for the same pipefail reason as the
   # DB wait above: a non-zero curl/exec while ORDS is still restarting must not
   # be masked into a false positive, nor a SIGPIPE into a false negative.
-  http=$($CONTAINER_CLI exec local-26ai-ords bash -c \
+  http=$($CONTAINER_CLI exec "${CONTAINER_NAME:-local-26ai}-ords" bash -c \
     "curl -fsS -o /dev/null -w '%{http_code}' http://localhost:8080/ords/" 2>/dev/null || true)
   case "$http" in
   200 | 30[0-9])
@@ -461,7 +485,7 @@ banner "Done"
 cat <<EOF
 The stack is up and APEX is installed.
 
-  APEX:           https://localhost:8181/ords/
+  APEX:           https://localhost:${ORDS_HTTP_PORT:-8181}/ords/
   APEX workspace: INTERNAL / ADMIN / (your ORACLE_PASSWORD from .env)
   SYS connection: sql -name "\$DB_CONN_NAME"   (after sourcing scripts/util/load_env.sh)
 

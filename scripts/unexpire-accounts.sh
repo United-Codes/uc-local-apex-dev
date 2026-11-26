@@ -5,8 +5,10 @@ set -e
 
 source ./scripts/util/load_env.sh
 
-sql -name "$DB_CONN_NAME" <<SQL
-set serveroutput on
+# -S hides the SQLcl banner, "feedback off" hides the "PL/SQL procedure
+# successfully completed" lines. Each account and each failure still gets a line.
+sql -S -name "$DB_CONN_NAME" <<SQL
+set serveroutput on feedback off
 
 DECLARE
   l_unexpire_command VARCHAR2(4000);

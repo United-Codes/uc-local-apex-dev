@@ -1,0 +1,122 @@
+---
+title: Upgrade the Database
+description: Two ways to move an existing installation to a new Oracle Database release update - image swap or export and import
+sidebar:
+  order: 2
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+Each new database version comes with a new branch of this project. The branch
+changes the image tag in `docker-compose.yml`. The migration guide of the release
+tells you which version comes with it.
+
+You can do the upgrade in two ways:
+
+| | Image swap | Export and import |
+| --- | --- | --- |
+| Time | Some minutes | Approximately 30 minutes and more. The time increases with the size of your data. |
+| Data | The datafiles stay. | The data moves into a new database. |
+| New features of the release update | Features that need new dictionary objects do not work. | The new database includes the dictionary objects for this release update. |
+| In-database JVM | The image swap can stop it. `fix-jvm` repairs it. | The new database includes the JVM for this release update. |
+| Restore gaps | The existing database keeps its data and secrets. | `unrecoverable.txt` lists items that need manual recovery, including secrets. |
+
+Use the image swap for a fast upgrade. Use export and import if you need the new
+features, or if you want a clean database.
+
+## Before you start
+
+1. Run `shrink-space` to reclaim unused space:
+
+   ```sh
+   ./local-26ai.sh shrink-space
+   ```
+
+2. Make sure that no change of yours is in the repository:
+
+   ```sh
+   git status
+   ```
+
+## Image swap
+
+1. Stop the database:
+
+   ```sh
+   ./local-26ai.sh stop
+   ```
+
+2. Switch to the new branch:
+
+   ```sh
+   git fetch
+   git checkout <new-branch>
+   ```
+
+3. Start the database. The command pulls the new image and creates the containers again:
+
+   ```sh
+   ./local-26ai.sh start
+   ```
+
+4. Test the in-database JVM, and reload it if it is broken:
+
+   ```sh
+   ./local-26ai.sh fix-jvm
+   ```
+
+5. If you installed `DBMS_CLOUD`, reload it:
+
+   ```sh
+   ./local-26ai.sh upgrade-dbms-cloud
+   ```
+
+The image swap does not install the new dictionary objects of the release update.
+No supported tool installs them. If you need them later, do the export and import.
+
+## Export and import
+
+The command `rebuild` does the full procedure. It backs up the running database,
+deletes the database volume, installs the new image, and imports the backup. See
+[Backups](/products/uc-local-apex-dev/docs/getting-started/backups/) for what the
+backup holds.
+
+1. Make sure that the database runs. Do not stop it. The backup needs the old database:
+
+   ```sh
+   docker ps
+   ```
+
+2. Switch to the new branch. Do not run `start`. The running container keeps the old image:
+
+   ```sh
+   git fetch
+   git checkout <new-branch>
+   ```
+
+3. Pull the new image before the rebuild. This step does not change the running containers:
+
+   ```sh
+   docker compose pull
+   ```
+
+4. Run the rebuild:
+
+   <Aside type="caution" title="rebuild deletes the database volume">
+     Before you run `rebuild`, copy `./backups/export` to a location outside the
+     repository. If you changed the ORDS configuration, copy `./ords-config` too.
+     `rebuild` deletes the database volume and the contents of `./ords-config`.
+   </Aside>
+
+   ```sh
+   ./local-26ai.sh rebuild
+   ```
+
+   The command runs `backup-all` first. Before you type the volume name, review
+   the restore gaps that `rebuild` shows.
+
+5. Review the items in `./backups/import/recovery/unrecoverable.txt`. Complete the
+   applicable steps in the [Backups guide](/products/uc-local-apex-dev/docs/getting-started/backups/#what-a-schema-export-does-not-carry).
+
+If a step fails after `rebuild` deletes the volume, use the backup in
+`./backups/import`. Run `./install.sh`. Then run `./local-26ai.sh import-all -y`.

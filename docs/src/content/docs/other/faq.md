@@ -33,21 +33,21 @@ To upgrade before the next migration guide, change the ORDS version in the `dock
 - Click on Patch Set Bundle
 - Log in with your Oracle account
 - Download the zip file
-- Unzip the file
-- Start a terminal in the directory
+- Unzip the file, or keep the zip file
 - Run this command:
 
 ```sh
-sql -name local-26ai-sys @catpatch.sql
+./local-26ai.sh patch-apex {path_to_patch_directory_or_zip}
 ```
 
-To update the APEX images (the static assets), run this command:
+The command accepts the unzipped directory or the zip file. To use the current directory, run `./local-26ai.sh patch-apex .` from the patch directory.
 
-```sh
-# make sure you are in the directory of the unzipped patch directory
+The command does these steps:
 
-cp -r ./images/* {path_to_your_cloned_repo}/apex-images
-```
+1. It runs `catpatch.sql` as the `SYS` user.
+2. It copies the `images` directory of the patch into `apex-images`.
+
+If the APEX version in your browser looks old, do a hard refresh.
 
 ## An APEX upgrade failed halfway. How do I retry it?
 
@@ -218,6 +218,38 @@ failure does not come back:
 ./local-26ai.sh shrink-space
 ```
 
+## The image pull fails with "unauthorized: Auth failed". What do I do?
+
+The `install.sh` script stops in the step `Pull container images`. The error looks like this:
+
+```
+Error response from daemon: Head "https://container-registry.oracle.com/v2/database/free/manifests/23.26.3.0": unauthorized: Auth failed.
+```
+
+The database and ORDS images of this project are public. You do not need a login to pull them.
+
+A stale login is a frequent cause. Docker or Podman saved an old login for the Oracle registry, for example from an earlier test of Oracle images. The saved login is not valid now. The engine sends it with the pull, and the registry rejects the request.
+
+1. Delete the saved login:
+
+   ```sh
+   docker logout container-registry.oracle.com   # or: podman logout container-registry.oracle.com
+   ```
+
+2. Run the installation again:
+
+   ```sh
+   ./install.sh
+   ```
+
+If the failure continues, pull the image by hand. Use the engine that ran `install.sh`, and the image and tag of the error message. This shows if the failure comes from the script or from the engine:
+
+```sh
+docker pull container-registry.oracle.com/database/free:23.26.3.0   # or: podman pull ...
+```
+
+If the pull still fails, make sure that no VPN or proxy changes the requests to the registry. An update of Docker Desktop or Podman can also help.
+
 ## The installation stops at `Container local-26ai Waiting`. What do I do?
 
 Update your copy of the repository. `install.sh` now starts the database alone,
@@ -248,3 +280,41 @@ podman compose up -d --no-deps ords-26ai
 
 `--no-deps` stops compose from reading the health status. The database is already
 open at this point, so the health gate has no more purpose.
+
+## The installation fails with "database did not become ready within 25 minutes". What do I do?
+
+The install script waits up to 25 minutes for the first boot of the database. The log shows `Database is not ready yet` and the wait grows to 64 seconds. Then the script stops with this error:
+
+```
+ERROR: database did not become ready within 25 minutes
+```
+
+The first boot can hang. The log shows that the listener and the instance started, but the line `DATABASE IS READY TO USE` never appears. The cause is not known. A new first boot from a clean state corrected the failure for one user.
+
+CAUTION: Do not use these commands on an installation that has data. The `volume rm` command deletes the database and all data in it.
+
+1. Stop the containers:
+
+   ```sh
+   docker compose down        # or: podman compose down
+   ```
+
+2. Delete the database volume:
+
+   ```sh
+   docker volume rm oradata-26ai   # or: podman volume rm oradata-26ai
+   ```
+
+3. Delete the `.env` file. The install script creates a new one:
+
+   ```sh
+   rm .env
+   ```
+
+4. Run the installation again:
+
+   ```sh
+   ./install.sh
+   ```
+
+If the failure comes back, read the database log with `docker compose logs 26ai`. Then open an issue in the [GitHub repository](https://github.com/United-Codes/uc-local-apex-dev) and attach the log.

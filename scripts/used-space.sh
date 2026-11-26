@@ -67,6 +67,11 @@ fi
 WARN_GB="${SPACE_WARN_GB:-9.5}"
 CRIT_GB="${SPACE_CRIT_GB:-11}"
 
+# The full report also lists the largest segments of every tablespace that uses
+# at least this much space. Only the full report shows it.
+DETAIL_MIN_MB=1024
+DETAIL_TOP_N=10
+
 # Read the numbers first, in one quiet call, so the status is decided in SQL.
 # bash 3.2 (the macOS default) cannot compare floats, so it must not try.
 # The ### sentinel strips the SQLcl banner -- same idiom as user-exists-in-db.sh.
@@ -121,21 +126,25 @@ if [ "$MODE" = "quiet" ]; then
   exit $RC
 fi
 
-sql -name "$DB_CONN_NAME" <<SQL
+# -S hides the SQLcl banner, "feedback off" hides the "Session altered" and the
+# "n rows selected" lines, and a large pagesize keeps each table under one header.
+sql -S -name "$DB_CONN_NAME" <<SQL
+set feedback off pagesize 1000 serveroutput on
 -- show 9.94 rather than 9,94, matching the sample output in the documentation
 alter session set nls_numeric_characters = '.,';
 
-SELECT
-    ROUND(SUM(bytes) / 1024 / 1024 / 1024, 2) AS current_gb,
-    12 AS limit_gb,
-    ROUND((SUM(bytes) / 1024 / 1024 / 1024 / 12) * 100, 2) AS percent_of_limit,
-    CASE
-        WHEN SUM(bytes) / 1024 / 1024 / 1024 >= $CRIT_GB THEN 'CRITICAL'
-        WHEN SUM(bytes) / 1024 / 1024 / 1024 >= $WARN_GB THEN 'WARNING'
-        ELSE 'OK'
-    END AS status
-FROM dba_data_files
-;
+declare
+  l_gb  number;
+  l_pct number;
+begin
+  select round(sum(bytes) / 1024 / 1024 / 1024, 2),
+         round(sum(bytes) / 1024 / 1024 / 1024 / 12 * 100, 2)
+    into l_gb, l_pct
+    from dba_data_files;
+  sys.dbms_output.put_line('Used space: ' || to_char(l_gb, 'fm990.00') ||
+    ' GB of 12 GB (' || to_char(l_pct, 'fm990.0') || ' %). Status: $STATUS');
+end;
+/
 
   select df.tablespace_name "Tablespace",
        df.totalspace "Total MB",
@@ -152,8 +161,96 @@ FROM dba_data_files
          group by tablespace_name) tu
  where df.tablespace_name = tu.tablespace_name
  order by totalspace desc;
+
+-- Detail for the big tablespaces: the largest segments in each one. A tablespace
+-- is big when its segments use DETAIL_MIN_MB or more. LOB segments and indexes
+-- show the table they belong to, because their system names tell nothing.
+prompt
+prompt Largest segments in tablespaces with $DETAIL_MIN_MB MB or more used:
+
+column "Tablespace" format a20
+column "Owner" format a24
+column "Segment" format a50
+column "Type" format a16
+column "Size MB" format 999,999,990
+column "Pct. of TS" format 990.0
+
+with ts as (
+  select tablespace_name, sum(bytes) ts_bytes
+    from dba_segments
+   group by tablespace_name
+  having sum(bytes) >= $DETAIL_MIN_MB * 1048576
+),
+ranked as (
+  select s.tablespace_name, s.owner, s.segment_name, s.segment_type, s.bytes,
+         ts.ts_bytes,
+         row_number() over (partition by s.tablespace_name
+                            order by s.bytes desc) rn
+    from dba_segments s
+    join ts on ts.tablespace_name = s.tablespace_name
+)
+select r.tablespace_name "Tablespace",
+       r.owner "Owner",
+       case
+         when l.table_name is not null
+           then l.table_name || '.' || l.column_name || ' (LOB)'
+         when i.table_name is not null
+           then r.segment_name || ' (on ' || i.table_name || ')'
+         else r.segment_name
+       end "Segment",
+       r.segment_type "Type",
+       round(r.bytes / 1048576) "Size MB",
+       round(100 * r.bytes / r.ts_bytes, 1) "Pct. of TS"
+  from ranked r
+  left join dba_lobs l
+    on r.segment_type like 'LOB%'
+   and l.owner = r.owner
+   and (l.segment_name = r.segment_name or l.index_name = r.segment_name)
+  left join dba_indexes i
+    on r.segment_type like 'INDEX%'
+   and i.owner = r.owner
+   and i.index_name = r.segment_name
+ where r.rn <= $DETAIL_TOP_N
+ order by r.ts_bytes desc, r.tablespace_name, r.bytes desc;
+
+-- APEX stores application files in a few shared tables, so the segment list above
+-- cannot say which application owns the space. This adds the owner. The sizes are
+-- the length of the file content. The segment is larger, because LOB storage has
+-- overhead and keeps the space of deleted files until a shrink.
+prompt
+prompt APEX file content per application (top $DETAIL_TOP_N):
+
+column "Workspace" format a20
+column "App" format 999999
+column "Application" format a50
+column "Content" format a22
+column "Files" format 999,990
+
+with f as (
+  select 'Application files' kind, flow_id app_id, security_group_id sgid,
+         dbms_lob.getlength(blob_content) len
+    from flows_files.wwv_flow_file_objects\$
+  union all
+  select 'Static files', application_id, null, dbms_lob.getlength(file_content)
+    from apex_application_static_files
+  union all
+  select 'Plug-in files', application_id, null, dbms_lob.getlength(file_content)
+    from apex_appl_plugin_files
+)
+select nvl(a.workspace, 'security group ' || f.sgid) "Workspace",
+       f.app_id "App",
+       substr(a.application_name, 1, 50) "Application",
+       f.kind "Content",
+       count(*) "Files",
+       round(sum(f.len) / 1048576, 1) "Size MB"
+  from f
+  left join apex_applications a on a.application_id = f.app_id
+ group by a.workspace, f.sgid, f.app_id, a.application_name, f.kind
+ order by sum(f.len) desc nulls last
+ fetch first $DETAIL_TOP_N rows only;
 SQL
 
+echo ""
 echo "Run the shrink-space script to reclaim unused space across all tablespaces."
 echo "To also make a single schema's data smaller, run: compress-space <schema>"
 echo "To stop one file from growing without a limit, run: cap-tablespaces --check"

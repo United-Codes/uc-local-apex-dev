@@ -5,6 +5,24 @@ set -e
 
 source ./scripts/util/load_env.sh
 
+# DBMS_CLOUD lives in the common user C##CLOUD$SERVICE, so the CDB root shows it.
+# Skip the long catcon run when a previous run already installed it. To reload
+# the packages after an image change, use upgrade-dbms-cloud.sh.
+installed=$($CONTAINER_CLI exec "$CONTAINER_NAME" bash -c '
+source /home/oracle/.bashrc 2>/dev/null
+$ORACLE_HOME/bin/sqlplus -S / as sysdba <<EOF
+set heading off feedback off pagesize 0 verify off
+select count(*) from dba_objects
+ where owner = '"'"'C##CLOUD\$SERVICE'"'"'
+   and object_name = '"'"'DBMS_CLOUD'"'"'
+   and object_type = '"'"'PACKAGE BODY'"'"';
+exit
+EOF
+' | tr -d '[:space:]')
+
+if [ "$installed" = "1" ]; then
+  echo "DBMS_CLOUD is already installed. Skipping the install scripts."
+else
 $CONTAINER_CLI exec "$CONTAINER_NAME" bash -c "
 \$ORACLE_HOME/perl/bin/perl \$ORACLE_HOME/rdbms/admin/catcon.pl \
   -u sys/$ORACLE_PASSWORD \
@@ -22,14 +40,16 @@ $CONTAINER_CLI exec "$CONTAINER_NAME" bash -c "
   -l /tmp \
   dbms_cloud_install.sql
 "
+fi
 
 echo "DBMS Cloud installation completed."
 
 
 TEMP_DIR=$(mktemp -d)
+trap 'rm -rf "$TEMP_DIR"' EXIT
 echo "Downloading Oracle Cloud certificates to $TEMP_DIR"
 
-curl -o "$TEMP_DIR/dbc_certs.tar" "https://objectstorage.us-phoenix-1.oraclecloud.com/p/KB63IAuDCGhz_azOVQ07Qa_mxL3bGrFh1dtsltreRJPbmb-VwsH2aQ4Pur2ADBMA/n/adwcdemo/b/CERTS/o/dbc_certs.tar"
+curl -fsS -o "$TEMP_DIR/dbc_certs.tar" "https://objectstorage.us-phoenix-1.oraclecloud.com/p/KB63IAuDCGhz_azOVQ07Qa_mxL3bGrFh1dtsltreRJPbmb-VwsH2aQ4Pur2ADBMA/n/adwcdemo/b/CERTS/o/dbc_certs.tar"
 
 tar -xf "$TEMP_DIR/dbc_certs.tar" -C "$TEMP_DIR"
 rm "$TEMP_DIR/dbc_certs.tar"
@@ -53,8 +73,13 @@ $CONTAINER_CLI exec -u root "${CONTAINER_NAME}" chown -R oracle:oinstall /opt/or
 $CONTAINER_CLI exec -u oracle $DOCKER_IT_FLAGS "${CONTAINER_NAME}" bash -c "
 set -e
 
+added=0
+skipped=0
 cd /opt/oracle/oradata/wallets/ssl/
-orapki wallet create -wallet . -pwd $ORACLE_PASSWORD -auto_login
+# A second run keeps the wallet that exists.
+if [ ! -f ewallet.p12 ]; then
+  orapki wallet create -wallet . -pwd $ORACLE_PASSWORD -auto_login
+fi
 
 # Check what certificate files we have
 echo 'Available certificate files:'
@@ -63,16 +88,19 @@ find . -name '*.cer' -o -name '*.crt' -o -name '*.pem' | head -10
 # Add certificate files to wallet
 for cert_file in *.cer *.crt *.pem; do
   if [ -f \"\$cert_file\" ]; then
-    echo \"Adding certificate: \$cert_file\"
-    orapki wallet add -wallet . -trusted_cert -cert \"\$cert_file\" -pwd $ORACLE_PASSWORD
+    # orapki rejects a certificate that is already in the wallet. That is not
+    # a failure, so count it and go on.
+    if orapki wallet add -wallet . -trusted_cert -cert \"\$cert_file\" -pwd $ORACLE_PASSWORD >/dev/null 2>&1; then
+      added=\$((added + 1))
+    else
+      skipped=\$((skipped + 1))
+    fi
   fi
 done
+echo \"Certificates added: \$added, skipped: \$skipped\"
 
 orapki wallet display -wallet .
 "
-
-# delete temp folder
-rm -rf "$TEMP_DIR"
 
 echo ""
 echo "================"
@@ -81,7 +109,8 @@ echo "================"
 
 
 # Network/wallet ACLs are per-PDB — grant them where DBMS_CLOUD is actually used.
-sql -name "$DB_CONN_NAME" <<EOF
+sql -S -name "$DB_CONN_NAME" <<EOF
+set feedback off
 begin
   -- Allow all hosts for HTTP/HTTP_PROXY
   sys.dbms_network_acl_admin.append_host_ace(
@@ -109,7 +138,8 @@ EOF
 
 # ssl_wallet is a database-wide property and must be set in the CDB root
 # (ORA-65040 when run from a PDB).
-sql sys/"$ORACLE_PASSWORD"@localhost:"$DBPORT"/FREE as SYSDBA <<EOF
+sql -S sys/"$ORACLE_PASSWORD"@localhost:"${DB_HOST_PORT:-1521}"/FREE as SYSDBA <<EOF
+set feedback off
 alter database property set ssl_wallet='file:/opt/oracle/oradata/wallets/ssl';
 
 exit
@@ -125,3 +155,28 @@ exit
 EOF'
 
 echo "Database restarted to apply wallet settings."
+
+# Check the result: package valid in the PDB, wallet set, ACLs present.
+# One line per value instead of a table for each.
+sql -S -name "$DB_CONN_NAME" <<EOF
+set feedback off serveroutput on
+begin
+  for r in (select object_type, status from dba_objects
+             where owner = 'C##CLOUD\$SERVICE' and object_name = 'DBMS_CLOUD'
+             order by object_type) loop
+    sys.dbms_output.put_line('DBMS_CLOUD ' || lower(r.object_type) || ': ' || r.status);
+  end loop;
+  for r in (select (select count(*) from dba_host_aces
+                     where principal = 'C##CLOUD\$SERVICE') host_aces,
+                   (select count(*) from dba_wallet_aces
+                     where principal = 'C##CLOUD\$SERVICE') wallet_aces,
+                   (select max(property_value) from database_properties
+                     where property_name = 'SSL_WALLET') ssl_wallet
+              from dual) loop
+    sys.dbms_output.put_line('Host ACEs: ' || r.host_aces || ', wallet ACEs: ' ||
+      r.wallet_aces || ', SSL wallet: ' || nvl(r.ssl_wallet, '(not set)'));
+  end loop;
+end;
+/
+exit
+EOF

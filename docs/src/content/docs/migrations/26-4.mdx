@@ -13,9 +13,9 @@ If you haven't installed uc-local-apex-dev yet, you can find the [setup instruct
 
 ## Changes
 
-- DB 23.26.2.0 → 23.26.3.0. The datafiles are compatible. No dump and restore is necessary. The data dictionary does not upgrade automatically. See [Upgrade the data dictionary](#upgrade-the-data-dictionary).
+- DB 23.26.2.0 → 23.26.3.0. The datafiles are compatible. No dump and restore is necessary. The data dictionary does not upgrade automatically, and the in-database JVM stops. See [Upgrade the data dictionary](#upgrade-the-data-dictionary).
 - ORDS 26.1.2 → 26.2.2. ORDS upgrades its own schema on the first start. No action is necessary.
-- New script `scripts/repair-ru-dictionary.sh` (`local-26ai.sh repair-ru-dictionary`). A change of the database image does not upgrade the data dictionary, and it also stops the in-database JVM without a message. The script repairs both. This migration needs it one time. One run also repairs the release updates that earlier image changes missed. See [Upgrade the data dictionary](#upgrade-the-data-dictionary).
+- New script `scripts/upgrade-dbms-cloud.sh` (`local-26ai.sh upgrade-dbms-cloud`). A change of the database image does not upgrade `DBMS_CLOUD`. The packages keep the code of the release update that installed them. If you installed `DBMS_CLOUD`, this migration needs the script one time. See [Upgrade DBMS_CLOUD](#upgrade-dbms_cloud).
 - The scripts detect the container engine now, so Podman works without changes. `CONTAINER_CLI` overrides the detected engine, and CI installs the project with both engines. Release 26.3 documented Podman, but the scripts called `docker` directly.
 - The project needs the Compose plugin (`docker compose`). The old `docker-compose` and `podman-compose` commands are no longer supported.
 - `install.sh` starts the database first and waits for it before it starts ORDS. Podman 5.5 and later do not report the container health status, so one `compose up -d` for the whole stack never continues. Docker is not affected. See the [FAQ](/products/uc-local-apex-dev/docs/other/faq/).
@@ -29,7 +29,7 @@ If you haven't installed uc-local-apex-dev yet, you can find the [setup instruct
   - `after-first-db-start.sh` now caps the undo datafile at 2048MB, sets `undo_retention` to 900, and caps `AUDIT_TRAIL` at 1GB. Undo autotuning grows an uncapped undo datafile without a limit, which was the cause of the failure above.
   - `after-first-db-start.sh` now creates the `UC_AUDIT_PURGE` job. The job keeps 7 days of unified audit records. The old code marked records as archivable but never purged them, so the audit tablespace grew forever. On one install it reached 1783MB.
   - `used-space.sh` gains `--summary` and `--quiet`, and it now reports through the exit code (`10` for `WARNING`, `11` for `CRITICAL`). The warning threshold moves from 10GB to 9.5GB. `SPACE_WARN_GB` and `SPACE_CRIT_GB` in `.env` change both thresholds.
-  - `stop.sh` now shows a warning if the database is close to the limit. This is the last point at which you can act.
+  - `stop.sh` now shows a warning if the database is close to the limit. This is the last point at which you can act. If the status is `CRITICAL`, the command runs `shrink-space --auto` first. If the status is still `CRITICAL` afterward, the command does not stop the database. Run `stop --force` to stop it anyway.
 
 ## Migration
 
@@ -44,6 +44,18 @@ Otherwise start the database:
 ```sh
 ./local-26ai.sh start
 ```
+
+### Reclaim space
+
+The new image and the APEX upgrade need free space. The Free edition limits the PDB to 12GB.
+
+Run `shrink-space` before you start the migration:
+
+```sh
+./local-26ai.sh shrink-space
+```
+
+The command reclaims unused space in the tablespaces. It also purges old audit records. This command can run for several minutes.
 
 ### Backup the database
 
@@ -91,67 +103,37 @@ The new instance-level parameters are applied by `upgrade-apex.sh` the next time
 
 ### Upgrade the data dictionary
 
-The image change does not upgrade the data dictionary. The database keeps the
-dictionary of the release update that created it.
+The image change does not upgrade the data dictionary. The database keeps the dictionary of the release update that created it.
 
-Release update 23.26.3 adds new dictionary views. It also adds a new version of
-the in-database JVM. A database from an earlier release update does not get these
-changes.
+Release update 23.26.3 adds new dictionary views. A database from an earlier release update does not get them. Features that need these views do not work. This project supports no tool that installs the views.
 
-The container starts and reports that it is healthy. Your data and your objects
-stay valid. Only the dictionary is incomplete.
+The container starts and reports that it is healthy. Your data and your objects stay valid.
 
-Show what is missing:
+The in-database JVM also stops without a message. Every Java call raises `ORA-29548`. Release 26.5 adds the command `fix-jvm`. It tests the JVM and reloads it if it is broken. After the 26.5 migration, run it:
 
 ```sh
-./scripts/repair-ru-dictionary.sh --check
+./local-26ai.sh fix-jvm
 ```
 
-Apply the repair:
+If you need the new features, start with a new database and import your schemas. Release 26.5 adds the `rebuild` command for this. See [Upgrade the Database](/products/uc-local-apex-dev/docs/migrations/upgrade-database/).
+
+### Upgrade DBMS_CLOUD
+
+If you never ran `install-dbms-cloud`, skip this section. The script stops with
+an error when `DBMS_CLOUD` is not installed.
+
+The image change does not upgrade `DBMS_CLOUD`. The packages keep the code of the
+release update that installed them. The new image ships newer code.
+
+Reload the packages:
 
 ```sh
-./scripts/repair-ru-dictionary.sh --repair
+./local-26ai.sh upgrade-dbms-cloud
 ```
 
-The script reloads the catalog scripts of Oracle for the missing features. It
-then reloads the in-database JVM. The repair needs some minutes. The database
-stays open, and a restart is not necessary.
-
-Make sure that the dictionary is now complete:
-
-```sh
-./scripts/repair-ru-dictionary.sh --summary
-```
-
-The output must contain `missing_repairable=0`, `jvm_ok=yes` and
-`non_valid_components=0`.
-
-<Aside type="note">
-  The repair corrects every release update that your database missed, not only
-  23.26.3. One database that started on 23.26.0 reported 13 missing views,
-  because earlier image changes left their own gaps. One `--repair` run closed
-  all of them.
-</Aside>
-
-The `dictionary_ru` line in the output keeps the name of the old release update.
-No supported tool updates this marker. The difference to `binary_version` is
-therefore expected, and you can ignore it.
-
-#### If a package stays INVALID
-
-The repair recompiles the database objects in parallel. A package body that uses
-a SQL macro can fail this recompilation. The error is `ORA-62565` with
-`PLS-00201`. The macro function itself is correct.
-
-The `sys.utl_recomp.recomp_serial()` block in [Verify](#verify) does not correct
-this error. That procedure recompiles in a background job, and the macro call
-fails again.
-
-If a package body stays `INVALID`, compile it directly:
-
-```sql
-alter package "OWNER"."PACKAGE_NAME" compile body;
-```
+The script runs the install scripts of Oracle again in the CDB root and in the
+PDBs. It does not change the wallet or the network ACLs, and it does not restart
+the database. You can run it again at any time.
 
 ### Optional: apply the new session limits to existing workspaces
 

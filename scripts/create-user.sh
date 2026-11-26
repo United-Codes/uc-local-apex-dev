@@ -119,7 +119,32 @@ else
   echo "${USERNAME_UPPER}_USER_PASSWORD=\"$USER_PASSWORD\"" >>.env
 fi
 
-sql -name "$DB_CONN_NAME" <<SQL
+# The script says what it does, step by step; the SQLcl output of each step goes
+# to a log instead of the screen. Lines with an error (ORA-, PLS-, SP2-) are
+# still shown, and if SQLcl itself fails the whole log is printed.
+SQL_LOG=$(mktemp)
+trap 'rm -f "$SQL_LOG"' EXIT
+quiet_sql() {
+  if ! "$@" >"$SQL_LOG" 2>&1; then
+    cat "$SQL_LOG"
+    return 1
+  fi
+  grep -E "ORA-|PLS-|SP2-" "$SQL_LOG" || true
+}
+
+# Counted from the grant lines below, so the message cannot drift from them.
+GRANT_COUNT=$(grep -cE '^[[:space:]]*grant[[:space:]].*[[:space:]]to[[:space:]]+\$\{USERNAME\};' "$0")
+
+echo "Creating schema ${USERNAME_UPPER}"
+echo "  - tablespace TBS_${USERNAME_UPPER} (max ${USER_TBS_MAXSIZE})"
+if [ "$compress" = true ]; then
+  echo "  - Advanced Compression on by default"
+fi
+echo "  - ${GRANT_COUNT} development grants: tables, views,"
+echo "    PL/SQL, jobs, JavaScript, AQ, Data Pump"
+echo "  - debugger access"
+
+quiet_sql sql -name "$DB_CONN_NAME" <<SQL
   select user from dual;
 
   create tablespace tbs_${USERNAME_LOWER}
@@ -193,17 +218,18 @@ ${COMPRESS_DEFAULTS}
   exit;
 SQL
 
-echo ">>>>"
-echo "created user"
-
 if [ "$skip_workspace" = true ]; then
-  echo ">>>>"
-  echo "skipped workspace creation"
+  echo "Skipping the APEX workspace (--skip-workspace)"
 else
   # get workspace settings (extended session timeout, etc)
   WS_SETTINGS=$(get_ws_settings "$USERNAME")
 
-  sql -name "$DB_CONN_NAME" <<SQL
+  echo "Creating APEX workspace ${USERNAME_UPPER}"
+  echo "  - developers ADMIN and ${USERNAME_UPPER}"
+  echo "  - no forced password change, no expiry"
+  echo "  - hosting extensions allowed"
+
+  quiet_sql sql -name "$DB_CONN_NAME" <<SQL
     select user from dual;
 
     BEGIN
@@ -258,14 +284,16 @@ else
     exit;
 SQL
 
-  echo ">>>>"
-  echo "created workspace. Access with username 'ADMIN' or ${USERNAME} and password ${WS_PASSWORD_LABEL}"
-  echo "http://localhost:8181/ords/r/apex/workspace-sign-in/oracle-apex-sign-in"
+  echo "  - password: ${WS_PASSWORD_LABEL}"
+  echo "  - login: http://localhost:${ORDS_HTTP_PORT:-8181}/ords/apex"
 fi
 
 USER_DB_CONN_NAME="${DB_CONN_BASE}-${USERNAME_LOWER}"
 
-sql "${USERNAME_LOWER}"/"${USER_PASSWORD}"@localhost:1521/FREEPDB1 <<SQL
+echo "Enabling ORDS REST for the schema"
+echo "Saving SQLcl connection ${USER_DB_CONN_NAME}"
+
+quiet_sql sql "${USERNAME_LOWER}"/"${USER_PASSWORD}"@localhost:"${DB_HOST_PORT:-1521}"/FREEPDB1 <<SQL
   select user from dual;
 
   conn -save ${USER_DB_CONN_NAME} -savepwd -replace
@@ -278,6 +306,5 @@ sql "${USERNAME_LOWER}"/"${USER_PASSWORD}"@localhost:1521/FREEPDB1 <<SQL
   exit;
 SQL
 
-echo ">>>>"
-echo "saved sqlcl connection"
-echo "connect with 'sql -name $USER_DB_CONN_NAME'"
+echo "Done. Connect with:"
+echo "  sql -name $USER_DB_CONN_NAME"

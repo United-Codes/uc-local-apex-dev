@@ -255,7 +255,46 @@ DBA_HIST_DATA_MEMORY_AREA
 # deliberately leaves out. So: if the control database does not have the view,
 # it does not belong in this list.
 
-ALL_PROBE_VIEWS="$NEW_VIEWS_23_26_1 $NEW_VIEWS_23_26_2 $NEW_VIEWS_23_26_3"
+# 23.26.4: from "Changes in This Release" (static views new in RU 23.26.4).
+NEW_VIEWS_23_26_4="
+DBA_ADDM_RULE_INFO USER_ADDM_RULE_INFO
+DBA_ADDM_RULE_STATISTICS USER_ADDM_RULE_STATISTICS
+DBA_DIRECTIVES ALL_DIRECTIVES USER_DIRECTIVES
+DBA_MACROS ALL_MACROS USER_MACROS
+DBA_MACRO_PARAMETERS ALL_MACRO_PARAMETERS USER_MACRO_PARAMETERS
+DBA_NOTIFICATION_DIRECTIVES ALL_NOTIFICATION_DIRECTIVES USER_NOTIFICATION_DIRECTIVES
+DBA_AI_AGENTS USER_AI_AGENTS
+DBA_ANNOTATIONS_GROUPS DBA_ANNOTATIONS_GROUP_MEMBERS DBA_ANNOTATIONS_AE
+DBA_MVIEW_EXTERNAL_TAB_FILES DBA_MVIEW_EXTERNAL_TAB_FRESHNESS
+DBA_PENDING_LAKE_TRANS
+DBA_QUANTIZED_VECTOR_INDEX_RECOMMENDATION_REPORT
+DBA_HIST_CELL_FLASH_CACHE_ADVISORY
+DBA_HIST_RAC_RECONF_HGRAM DBA_HIST_RAC_RECONF_HISTORY
+"
+# The AI_AGENTS .. RAC_RECONF lines are NOT in Oracle's 23.26.4 page. They come
+# from the home diff and were each confirmed present on a fresh 23.26.4 database.
+
+# Package scripts an RU added or changed that no view script or apply script
+# pulls in. They run after the apply scripts and before the view scripts.
+#
+# 23.26.4 (found by the 23.26.3 -> 23.26.4 swap test):
+#   dbmswrr_state.sql  creates SYS.DBMS_WRR_STATE. The new DBMS_RANDOM body
+#                      references it. Without it DBMS_RANDOM stays INVALID
+#                      (PLS-00201) and CATPROC is INVALID in every container.
+#   prvtsnps.plb / prvtsnap.plb  DBMS_SNAP_INTERNAL gained GET_FILE_FRESHNESS.
+#                      catfct.sql builds DBA_MVIEW_EXTERNAL_TAB_FRESHNESS on it
+#                      and fails with ORA-00904 on the old package, leaving a
+#                      dangling synonym (ORA-01775).
+# They run BEFORE the view scripts (catfct.sql needs the new package spec) and
+# again AFTER them: a view script can be c21.sql, Oracle's upgrade-time script
+# for basic dictionary objects, and it contains DROP PACKAGE dbms_wrr_state.
+# In a real upgrade catproc recreates the package afterwards. Here nothing does,
+# so the second run is what leaves DBMS_WRR_STATE in place.
+# Every file here is CREATE OR REPLACE, so a re-run is safe. Files the home does
+# not have are skipped, so the list can span several RUs.
+NEW_PKG_SCRIPTS="dbmswrr_state.sql prvtsnps.plb prvtsnap.plb"
+
+ALL_PROBE_VIEWS="$NEW_VIEWS_23_26_1 $NEW_VIEWS_23_26_2 $NEW_VIEWS_23_26_3 $NEW_VIEWS_23_26_4"
 
 # ---------------------------------------------------------------------------
 # Arguments
@@ -762,13 +801,31 @@ repair() {
   # catawrtb (the tables) first, then catawrrtvw, catawrpdbvw, catawrcdbvw,
   # catawrvw, catawrhubvw and catawrappvw in that order. Use it instead of any
   # individual AWR view script, so the ordering stays Oracle's problem.
+  #
+  # catadv.sql has the same gap. The ADDM rule views (DBA_ADDM_RULE_INFO and
+  # relatives, 23.26.4) select from WRI$_ADV_ADDM_RULE_* tables that only
+  # catadvtb.sql creates. Without it the synonyms dangle (ORA-01775) exactly
+  # like the AWR ones. catadvtb.sql is re-runnable: CREATE TABLE on an existing
+  # table only raises ORA-00955, and its duc$ rows are DELETEd before INSERT.
+  # Verified on 23.26.3 -> 23.26.4.
   local mapped="" vs
   for vs in $vscripts; do
-    case "$vs" in catawr*vw.sql) vs="catawrtv.sql" ;; esac
-    case " $mapped " in *" $vs "*) ;; *) mapped="$mapped $vs" ;; esac
+    case "$vs" in
+      catawr*vw.sql) vs="catawrtv.sql" ;;
+      catadv.sql)    vs="catadvtb.sql catadv.sql" ;;
+    esac
+    for vs in $vs; do
+      case " $mapped " in *" $vs "*) ;; *) mapped="$mapped $vs" ;; esac
+    done
   done
   vscripts="$mapped"
 
+  local pkgscripts="" ps
+  for ps in $NEW_PKG_SCRIPTS; do
+    if orash "[ -f \$ORACLE_HOME/rdbms/admin/$ps ]"; then pkgscripts="$pkgscripts $ps"; fi
+  done
+
+  echo "  Package scripts:${pkgscripts:- (none)}"
   echo "  View scripts:   ${vscripts:-(none)}"
   echo "  Apply scripts:  ${ascripts:-(none)}"
 
@@ -798,9 +855,17 @@ repair() {
       step "Pass $pass: backport apply scripts (base tables, privileges, registry\$backports)"
       catcon '$ORACLE_HOME/rdbms/admin/backport_files' "rurepair_apply$pass" $ascripts
     fi
+    if [ -n "$pkgscripts" ]; then
+      step "Pass $pass: package scripts (new package specs and bodies)"
+      catcon '$ORACLE_HOME/rdbms/admin' "rurepair_pkg$pass" $pkgscripts
+    fi
     if [ -n "$vscripts" ]; then
       step "Pass $pass: view scripts"
       catcon '$ORACLE_HOME/rdbms/admin' "rurepair_views$pass" $vscripts
+    fi
+    if [ -n "$pkgscripts" ]; then
+      step "Pass $pass: package scripts again (undo any DROP PACKAGE in a view script)"
+      catcon '$ORACLE_HOME/rdbms/admin' "rurepair_pkgb$pass" $pkgscripts
     fi
     after="$(missing_views | grep -c . || true)"
     if [ "$after" = "0" ]; then

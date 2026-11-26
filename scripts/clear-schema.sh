@@ -40,8 +40,11 @@ if [[ $answer == "y" ]] || [[ $answer == "Y" ]]; then
 
   USER_DB_CONN_NAME="${DB_CONN_BASE}-${USERNAME_LOWER}"
 
-  sql -name "$USER_DB_CONN_NAME" <<SQL
-    select user from dual;
+  # -S hides the SQLcl banner, "feedback off" hides the "PL/SQL procedure
+  # successfully completed" lines. The connected user is one line.
+  sql -S -name "$USER_DB_CONN_NAME" <<SQL
+    set serveroutput on feedback off
+    exec sys.dbms_output.put_line('Connected as ' || user);
 
     @./scripts/sql/drop_all.sql
 
@@ -61,10 +64,8 @@ else
 fi
 
 if [[ $answer2 == "y" ]] || [[ $answer2 == "Y" ]]; then
-  sql -name "$USER_DB_CONN_NAME" <<SQL
-    select user from dual;
-
-    set serveroutput on size unlimited
+  sql -S -name "$USER_DB_CONN_NAME" <<SQL
+    set serveroutput on size unlimited feedback off
 
     @./scripts/sql/drop_apex_apps.sql
 

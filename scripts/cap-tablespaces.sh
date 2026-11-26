@@ -182,7 +182,10 @@ SQL
   exit 0
 fi
 
-sql -name "$DB_CONN_NAME" <<SQL
+# -S hides the SQLcl banner. "feedback 1000" hides the "n rows selected" lines,
+# but keeps "no rows selected", so an empty list still says that it is empty.
+sql -S -name "$DB_CONN_NAME" <<SQL
+set feedback off serveroutput on
 alter session set nls_numeric_characters = '.,';
 set lines 200 pages 200
 col tablespace_name format a24
@@ -190,11 +193,16 @@ col file_name format a54
 col state format a10
 
 prompt
-prompt Space against the 12GB Free-edition limit:
-select round(sum(bytes)/1024/1024/1024, 2) current_gb,
-       12 limit_gb,
-       round(12 - sum(bytes)/1024/1024/1024, 2) headroom_gb
-  from dba_data_files;
+declare
+  l_gb number;
+begin
+  select round(sum(bytes)/1024/1024/1024, 2) into l_gb from dba_data_files;
+  sys.dbms_output.put_line('Space against the 12GB Free-edition limit: ' ||
+    to_char(l_gb, 'fm990.00') || ' GB used, ' ||
+    to_char(12 - l_gb, 'fm990.00') || ' GB headroom');
+end;
+/
+set feedback 1000
 
 prompt
 prompt Datafiles that need a ceiling change ("none" can grow until the PDB stops opening):
@@ -273,8 +281,8 @@ if [ "$answer" != "y" ] && [ "$answer" != "Y" ]; then
   exit 0
 fi
 
-sql -name "$DB_CONN_NAME" <<SQL
-set serveroutput on size unlimited
+sql -S -name "$DB_CONN_NAME" <<SQL
+set serveroutput on size unlimited feedback off
 
 declare
   l_n number := 0;

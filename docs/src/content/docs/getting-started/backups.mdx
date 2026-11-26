@@ -17,10 +17,11 @@ local-26ai.sh backup-all
 
 The script writes the files to the `./backups/export` directory.
 
-The command backs up every schema that has a `<NAME>_USER_PASSWORD` entry in
-`.env`. If a schema has no APEX workspace, the command skips the APEX part and
-continues. If a schema fails, the command shows a summary at the end and returns
-a non-zero exit code.
+The command backs up the schemas in `.env` and the other schemas that it finds in
+the database. See [What a schema export does not carry](#what-a-schema-export-does-not-carry).
+If a schema has no APEX workspace, the command skips the APEX part and continues.
+If a schema backup fails, `backup-all` shows the failed schemas in its summary.
+It exits with code `1`.
 
 ### Backup Specific Schema
 
@@ -30,16 +31,179 @@ Back up a single schema with its workspace and applications:
 local-26ai.sh backup-user movies
 ```
 
-Each run writes three things:
+Each run writes these files:
 
 - `./backups/export/movies.dmp` is the DataPump dump of the schema.
 - `./backups/export/apex/movies/` holds the workspace export and one file per
-  application.
+  application. The command writes it only if the schema has an APEX workspace.
 - `./backups/export/ords/movies/rest_schema.sql` holds the ORDS REST
-  definitions.
+  definitions. The command writes it only if the schema is REST-enabled.
 
-The command keeps the dump of the previous run as `movies_bkp.dmp`. It rotates
-that file only after the new export succeeds.
+Before the export, the command renames the dump of the previous run to
+`movies_bkp.dmp`. If the export fails, the command stops with an error, and
+`movies_bkp.dmp` stays. The command does not use an old dump from an earlier run.
+
+If DataPump reports errors, the command keeps the new dump and shows a warning.
+Read the export log `./backups/export/movies.log` before you use such a dump.
+
+### What a schema export does not carry
+
+A DataPump schema export carries the objects of one schema. It does not carry
+these things:
+
+- Profiles, custom tablespaces, roles, directories, and the files in the directories.
+- System privileges, roles, default roles, proxy users, and grants between schemas.
+- Grants on objects of `SYS`, for example `execute on utl_http`.
+- Public synonyms, network and wallet access entries, application contexts, and audit policies.
+- Scheduler job classes, windows, and window groups, and Resource Manager plans.
+- Editions and public database links.
+- Assertions and schema privileges (`grant ... on schema`).
+- Deep Data Security data roles, end users, and data grants.
+- APEX instance settings, for example the SMTP host.
+- Secrets. Nobody can read passwords of credentials and database links.
+
+`backup-all` runs `export-gaps` first. The command only reads the database. It
+writes these files to `./backups/export/recovery`:
+
+| File | Content |
+| --- | --- |
+| `schemas.tsv` | The schemas to back up. The value `discovered` marks a schema that is not in `.env`. |
+| `00_pre.sql` | SQL that runs before the imports. It creates profiles, tablespaces, roles, data roles, and directories. It also creates editions, Resource Manager plans, job classes, scheduler windows, and the discovered users. |
+| `05_domains.sql` | SQL domains whose DataPump DDL fails, with corrected DDL. It runs before the imports. |
+| `10_post.sql` | SQL that runs after the imports. It gives grants, schema privileges, default roles, and proxy users. It creates assertions, public synonyms, network entries, contexts, and policies. It also creates credential stubs, end users, data grants, and APEX instance settings. |
+| `params.tsv` | Settings and components of the old database: vector memory, `DBMS_CLOUD`, and utPLSQL. |
+| `data_grant_schemas.txt` | The schemas with data grants. The import leaves out their XS objects, and `10_post.sql` creates the data grants. |
+| `dirs.tsv` and `dirfiles/` | The custom directories and a copy of their files. |
+| `ai_profiles.sql` | The Select AI profiles. `import-all` does not run this file. |
+| `manifest.tsv` | The schema objects and the SQL domains of their columns. |
+| `unrecoverable.txt` | Items that the backup cannot restore automatically. |
+| `gaps-report.txt` | A summary. |
+
+`backup-all` takes a DataPump export of each schema in `schemas.tsv`, including
+its table data. The list includes schemas in `.env` and other user schemas with
+objects or an APEX workspace. This covers schemas that you create by hand.
+`00_pre.sql` creates the users outside `.env` before DataPump imports their data.
+The list excludes Oracle accounts and the accounts of APEX, ORDS, and utPLSQL.
+
+If `export-gaps` fails, `backup-all` backs up only the schemas in `.env`. It then
+exits with an error, so `rebuild` does not delete the database.
+
+For a schema in `.env`, DataPump runs as the owner. VPD and Data Redaction
+policies can hide rows from the owner. For a schema that is not in `.env`,
+DataPump and the ORDS export run as `SYS`, so no policy hides rows.
+
+A schema that is not in `.env` gets a temporary password in two cases. The first
+case is the APEX export of a schema with a workspace. The second case is the ORDS
+import. The command puts the old password hash back at the end, also after a
+failure. If the command shows `could not restore the password`, run
+`./backups/.pw-restore/<schema>.sql` as `SYS`.
+
+The files `00_pre.sql` and `10_post.sql` hold the grants beyond the grants that
+`create-user.sh` gives to every new schema.
+
+To run the command alone, use:
+
+```bash
+local-26ai.sh export-gaps
+```
+
+`export-gaps` copies the files of each custom directory into `dirfiles/`. Examples
+are the files of an external table, a BFILE, or a file for `UTL_FILE`. The limit is
+200 MB for each directory. To change the limit, set `DIR_FILES_MAX_MB` in `.env`.
+`import-all` creates the path in the container and puts the files back.
+
+<Aside type="caution" title="Review restore gaps">
+  Before you confirm the rebuild, review the restore gaps. The file
+  `unrecoverable.txt` lists items that the backup cannot restore automatically.
+  `backup-all`, `rebuild`, and `import-all` show the list at the end of a
+  successful run:
+
+  - Passwords for `DBMS_CREDENTIAL` credentials. `10_post.sql` recreates the
+    credentials with `CHANGE_ME`. Replace the placeholder with the real password.
+  - APEX web credential secrets. See [Restore APEX web credentials](#restore-apex-web-credentials).
+  - Private database link passwords and the APEX SMTP password.
+  - Public database links with a stored password.
+  - Data Redaction policies of a type other than full, nullify, random, and partial.
+  - Wallet files. The backup holds the wallet access entries, but not the wallet.
+    Copy the wallet files yourself.
+  - Objects that exist only in other editions. DataPump exports the default
+    edition. If you use Edition-Based Redefinition, save the definitions from
+    the other editions before the rebuild.
+  - SQL plan baselines. The optimizer chooses the plans again.
+  - SQL Firewall allow lists.
+  - A directory that holds more files than the limit.
+  - VPD policies in a policy group other than `SYS_DEFAULT`.
+  - Unsent APEX mails.
+  - Table rows that DataPump skipped during the export. `backup-all` shows the
+    tables. An example is ORA-30657 on some tables with SQL domains.
+  - Tables where an invisible virtual column comes before SQL domain columns.
+    DataPump can assign a domain to the next column. If the data types are
+    compatible, the wrong domain stays without an error.
+    If the data types are incompatible, the import can report ORA-11517.
+  - Select AI profiles. Set up the credential for the profile first. Then run
+    the profile's block of `ai_profiles.sql` as its owner.
+  - Tables with more than 1000 columns. Set `MAX_COLUMNS = EXTENDED` on the new
+    database before the import. `rebuild` does not stop for this step. Do the
+    restore step by step: run `./install.sh`, set the parameter, and run `import-all`.
+  - Passwords of Deep Data Security end users. The end users come back locked
+    with a random password. Set the password and unlock each end user.
+  - Deep Data Security related-table grants (`WHEN ... GRANTED ON`). Create them again.
+  - The time window of a data role grant to an end user.
+</Aside>
+
+#### Restore APEX web credentials
+
+If an application export includes a web credential, the import creates its
+definition without the secret. If the target workspace already has the same
+static ID, APEX uses that credential. The workspace export alone does not
+carry the credential definition.
+
+In the target workspace, open **Workspace Utilities → Web Credentials**. If a
+credential is missing, recreate it with its original static ID. Enter the
+secret for each credential that needs it.
+
+#### Known DataPump import problems
+
+Data grants that DataPump imports are in the dictionary, but they do not work
+(seen on 23.26.3). An end user then gets ORA-00942. For this reason, the import
+leaves out the XS objects of a schema with data grants, and `10_post.sql`
+creates the data grants with `CREATE DATA GRANT`.
+
+In 23.26.4.0, DataPump exports assertion helper tables as ordinary tables. These
+tables can block assertion creation with `ORA-08730`. If the target schema has
+no assertions, `10_post.sql` drops the helper tables before it creates the
+assertions.
+
+#### Verify the restore
+
+After the restore, `import-all` compares object names and column domain links
+with `manifest.tsv`. The command can find a missing Advanced Queuing queue or
+Oracle Text index. It can also find a recorded SQL domain that DataPump omitted
+or assigned to the wrong column. If an entry from the backup is missing,
+`import-all` exits with code `1`.
+
+The comparison excludes rows, grants, object status, and generated objects. It
+shows up to 30 differences and gives the count of any others. A statement
+failure in `00_pre.sql` or `10_post.sql` does not stop the command. After each
+restore, read the logs in `./backups/import/logs`. Make sure that your important
+data came back.
+
+To test this, use `test-backup-fixtures.sh` on a database that you do not use.
+It creates hand-made users, grants, synonyms, jobs, scheduler windows, Resource
+Manager plans, editions, directories with files, policies, an APEX workspace, and
+ORDS modules. It needs one schema in `.env`. Run these commands:
+
+```bash
+./scripts/test-backup-fixtures.sh create
+./scripts/test-backup-fixtures.sh probe before.txt
+./local-26ai.sh rebuild
+./scripts/test-backup-fixtures.sh probe after.txt
+./scripts/test-backup-fixtures.sh compare before.txt after.txt
+```
+
+The comparison shows differences for items such as the standalone APEX web
+credential, the object in another edition, and the SQL plan baseline. The APEX
+probe compares credential static IDs. It cannot compare the secrets.
 
 ### Import Backup
 
@@ -59,13 +223,125 @@ first.
   fix-ws-group-ids` before the import.
 </Aside>
 
+### Import a Dump from Another Database
+
+A dump from another database, for example a production export, keeps the
+tablespace names of that database. If a tablespace does not exist here, every
+table fails with `ORA-00959`. The job still reports `COMPLETED`.
+
+Each schema of this environment has its own tablespace with the name
+`TBS_<NAME>`. Remap the tablespaces of the dump to that tablespace with `-rt`:
+
+```bash
+local-26ai.sh import-datapump uc -rt UC=TBS_UC
+```
+
+If the dump uses more than one tablespace, separate the pairs with a comma:
+`-rt UC=TBS_UC,UC_IDX=TBS_UC`. The `import-backup` command accepts the same
+`-rt` flag.
+
 ### Import All Users
 
-Restore every export file in the `./backups/import` directory:
+Copy these items from `./backups/export` to `./backups/import` before you start:
+the dumps, the `apex` and `ords` directories, and the `recovery` directory.
+Then restore the schemas:
 
 ```bash
 local-26ai.sh import-all
 ```
 
-The command reads the `<NAME>_USER_PASSWORD` entries in `.env` and asks for
-confirmation. It then restores one schema after the other.
+The command restores the schemas in `recovery/schemas.tsv`. If this file does not
+exist, it restores the schemas of the `<NAME>_USER_PASSWORD` entries in `.env`.
+It asks for confirmation. Use `-y` to skip the confirmation.
+
+The command runs `00_pre.sql` as `SYS` before the imports, and `10_post.sql` after
+the last schema. The logs are in `./backups/import/logs`. While the import runs,
+the command sets `job_queue_processes` to 0, so imported jobs do not start. If
+this setting fails, the import continues.
+
+If the old database had `DBMS_CLOUD` or utPLSQL, install them before the import.
+`import-all` shows a note if they are missing. If you install `DBMS_CLOUD` after
+the import, run `recovery/10_post.sql` as `SYS` again. `rebuild` installs both
+components automatically.
+
+### Applications with a missing master component
+
+An APEX application can subscribe to a master component. The import fails with
+`ORA-20987` if the master is not in the database. Two cases exist:
+
+- The master is another application of the same schema. The import tries the
+  failed application again after the other applications of the schema. It then
+  finds the master.
+- The master is in no application of the schema. One example is a theme style or
+  a plug-in that no application in the database has any more. The error is
+  already in the source database. The APEX patch bundle 26.2.1 does not correct it.
+
+If the error names a missing master component, `import-backup` imports the
+application again from a temporary copy without that subscription. It shows a
+`WARNING` line for each removed subscription. The component stays in the
+application as a normal component without a master.
+
+If a workspace with the same ID exists already, the import of the workspace is
+skipped. The applications are imported again.
+
+### Import Faster with Parallel Jobs
+
+Use `-j` to run the DataPump import of more than one schema at the same time:
+
+```bash
+local-26ai.sh import-all -y -j 2
+```
+
+Only the DataPump step runs in parallel. The command creates all users first. Then
+it imports the APEX workspaces and applications and the ORDS definitions one after
+the other. The logs of each schema are in `./backups/import/logs`.
+
+The Free edition uses 2 CPUs. A value above 2 does not make the import faster.
+
+### Rebuild the Database
+
+Use `rebuild` to start with a new database and restore the backup.
+
+<Aside type="caution" title="rebuild deletes the database">
+  Before you run `rebuild`, copy `./backups/export` to a location outside the
+  repository. If you changed the ORDS configuration, copy `./ords-config` too.
+  `rebuild` deletes the database volume, the contents of `./ords-config`, and the
+  old backup files in `./backups/import`. If you have a separate database, test
+  the restore there.
+</Aside>
+
+```bash
+local-26ai.sh rebuild
+```
+
+The command does these steps:
+
+1. It runs `backup-all`.
+2. It copies `./backups/export` to `./backups/import`.
+3. It stops the containers. It deletes the contents of `./ords-config` before
+   it deletes the database volume.
+4. It runs `install.sh` with the image in `docker-compose.yml`. If the old
+   database had DBMS_CLOUD or utPLSQL, it installs them too.
+5. It runs `import-all`.
+
+`import-all` also prepares the new database:
+
+- If the old database had more vector memory (RAM for HNSW vector indexes),
+  `import-all` sets the same size. The database restarts once. If the
+  setting fails, read `./backups/import/logs/vector_memory.log`.
+- Some SQL domains have DDL that DataPump cannot run, for example
+  `TIMESTAMP () WITH TIME ZONE`. `import-all` creates them with corrected DDL
+  before the DataPump import (`05_domains.sql`).
+
+Change the image tag in `docker-compose.yml` before you run the command. The file
+`.env` stays, so the passwords stay the same.
+
+The backup runs first. Before you type the volume name, review the restore gaps
+that `rebuild` shows. If the list is not empty and you use `-y`, `rebuild` stops
+before it deletes the database. Add `--accept-losses` to continue with those gaps.
+Exit code 2 means that the import completed and some items need manual recovery.
+Use `unrecoverable.txt` to identify those items.
+
+If a step after the delete fails, the backup is in `./backups/import`. Run
+`./install.sh`. Install `DBMS_CLOUD` and utPLSQL if the old database had them.
+Then run `./local-26ai.sh import-all -y`.
