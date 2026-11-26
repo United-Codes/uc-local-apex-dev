@@ -483,6 +483,19 @@ declare
     if p <= length(c) then dbms_output.put_line(substr(c, p)); end if;
   end;
 begin
+  -- 23.26.4: DataPump exports the auxiliary tables of an assertion (ORA$SA$...)
+  -- as normal tables. After the import they block CREATE ASSERTION with
+  -- ORA-08730. A schema without an assertion has no use for them, so drop them.
+  for o in (select distinct owner from dba_assertions where owner in (&u_filter) order by owner) loop
+    dbms_output.put_line('begin');
+    dbms_output.put_line('  for t in (select table_name from dba_tables where owner = ''' || o.owner || '''');
+    dbms_output.put_line('             and table_name like ''ORA$SA$%''');
+    dbms_output.put_line('             and not exists (select 1 from dba_assertions where owner = ''' || o.owner || ''')) loop');
+    dbms_output.put_line('    execute immediate ''drop table "' || o.owner || '"."'' || t.table_name || ''" purge'';');
+    dbms_output.put_line('  end loop;');
+    dbms_output.put_line('end;');
+    dbms_output.put_line('/');
+  end loop;
   for r in (select definition_sql from dba_assertions where owner in (&u_filter) order by owner, assertion_name) loop
     emit(rtrim(r.definition_sql, chr(10) || ' ;') || ';');
   end loop;
