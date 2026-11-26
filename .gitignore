@@ -14,3 +14,4 @@ META-INF/**/*
 apex-images
 install_*.log
 .fetch-client/
+.dblinter

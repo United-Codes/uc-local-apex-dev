@@ -31,15 +31,15 @@ Use pragmatic mode. Domain words stay (`tablespace`, `datafile`, `workspace`,
 
 Use these terms only. Do not rotate synonyms.
 
-| Concept | Term to use |
-| --- | --- |
-| Assert that a condition is true | make sure that |
-| Show information on screen | show |
-| Start a command | run |
-| Configuration data in prose | configuration, configuration file |
-| Delete a database object | drop |
-| Delete a file or a directory | delete |
-| A failed operation | failure (an error message is an error) |
+| Concept                         | Term to use                            |
+| ------------------------------- | -------------------------------------- |
+| Assert that a condition is true | make sure that                         |
+| Show information on screen      | show                                   |
+| Start a command                 | run                                    |
+| Configuration data in prose     | configuration, configuration file      |
+| Delete a database object        | drop                                   |
+| Delete a file or a directory    | delete                                 |
+| A failed operation              | failure (an error message is an error) |
 
 The folder name `ords-config` and the APEX label "Workspace settings" are product
 names. Keep them exact.
@@ -61,3 +61,23 @@ names. Keep them exact.
 ```bash
 cd docs && bun install && bun run build
 ```
+
+## Linting PL/SQL with dbLinter
+
+After writing or changing any SQL or PL/SQL, lint it with dbLinter and fix
+every violation before considering the task complete.
+
+Run from the project root. The committed `dblinter.properties` holds the shared
+config; never store personal credentials there.
+
+Check everything:
+
+```sh
+dblinter check ./scripts
+```
+
+Then read the report at `./.dblinter/check.sarif.sarif`, address each finding,
+and re-run until it is clean.
+
+For a genuine false positive or a deliberate exception, suppress the specific
+rule inline and always give a reason. Scope is controlled by where you place the comment (line / block / file):
