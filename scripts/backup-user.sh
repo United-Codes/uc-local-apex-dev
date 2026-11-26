@@ -53,8 +53,8 @@ mkdir -p "$EXPORT_DIR"
 # add roughly 1 MB to every later dump of the same schema, because the next
 # export picks them up as ordinary tables.
 drop_dp_master_tables() {
-  sql -name "$DP_CONN_NAME" <<'SQL' || true
-    set serveroutput on size unlimited
+  sql -S -name "$DP_CONN_NAME" <<'SQL' || true
+    set serveroutput on size unlimited feedback off
     @./scripts/sql/drop_dp_tables.sql
     exit;
 SQL

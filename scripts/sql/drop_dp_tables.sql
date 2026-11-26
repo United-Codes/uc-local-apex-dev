@@ -13,8 +13,8 @@ DECLARE
   l_sql     VARCHAR2(4000 CHAR);
   l_dropped PLS_INTEGER := 0;
 BEGIN
-  sys.DBMS_OUTPUT.PUT_LINE('Starting Data Pump master table cleanup (ESQL_/ISQL_)...');
-  sys.DBMS_OUTPUT.PUT_LINE('-----------------------------');
+  -- Print a line only for a table that was dropped or skipped. A run with
+  -- nothing to drop prints nothing.
 
   <<master_tables>>
   FOR tab_rec IN (SELECT table_name
@@ -42,7 +42,9 @@ BEGIN
     END;
   END LOOP master_tables;
 
-  sys.DBMS_OUTPUT.PUT_LINE('Dropped ' || l_dropped || ' master table(s).');
+  IF l_dropped > 0 THEN
+    sys.DBMS_OUTPUT.PUT_LINE('Dropped ' || l_dropped || ' Data Pump master table(s).');
+  END IF;
 EXCEPTION
   WHEN OTHERS THEN
     sys.DBMS_OUTPUT.PUT_LINE('Error: ' || SQLERRM || ' - Backtrace: ' || sys.dbms_utility.format_error_backtrace);

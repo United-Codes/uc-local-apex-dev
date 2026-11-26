@@ -82,8 +82,8 @@ fi
 # and there is no switch to stop it (see scripts/sql/drop_dp_tables.sql). Drop it
 # from a trap so an import that dies half way does not leave one behind.
 drop_dp_master_tables() {
-  sql -name "$SQLCRED_NAME" <<'SQL' || true
-    set serveroutput on size unlimited
+  sql -S -name "$SQLCRED_NAME" <<'SQL' || true
+    set serveroutput on size unlimited feedback off
     @./scripts/sql/drop_dp_tables.sql
     exit;
 SQL
@@ -100,9 +100,8 @@ trap drop_dp_master_tables EXIT
 # SQL_DOMAIN, DOMAIN_ASSOCIATION, IDENTITY_COLUMN and VECTOR_INDEX all vanished
 # without an error. Never lower this, and never let it fall back to the SQLcl
 # default of COMPATIBLE.
-sql -name "$SQLCRED_NAME" <<SQL
-  select user from dual;
-
+sql -S -name "$SQLCRED_NAME" <<SQL
+  set feedback off
   prompt == SQLcl warm-up. The next "DATA_PUMP_DIR is not valid" message is
   prompt == expected and harmless. The real import follows it.
   datapump import -noexec TRUE
