@@ -171,6 +171,43 @@ SQL
   fi
 fi
 
+# Tier 2b: rebuild bloated tables (non-destructive).
+# A delete does not lower the high-water mark of a table. A log table that once
+# held millions of rows keeps its whole segment after a purge, and shrink_tablespace
+# cannot compact it. scripts/sql/rebuild_bloated_tables.sql finds such tables
+# (segment of 50 MB or more, live rows below half of it) and rebuilds them with
+# "alter table ... move online" plus an online rebuild of their indexes.
+# The prompt defaults to yes, because the rebuild loses no data. Without a terminal
+# or with --auto, the rebuild runs without a prompt.
+echo "Looking for bloated tables..."
+BLOATED=$(sql -S -name "$DB_CONN_NAME" 2>/dev/null <<'SQL' | grep '^###' | sed 's/^###//'
+define MODE=list
+@./scripts/sql/rebuild_bloated_tables.sql
+SQL
+)
+
+if [ -z "$BLOATED" ]; then
+  echo "No bloated tables found."
+else
+  echo "Found bloated tables (segment size against the size of the live rows):"
+  echo "$BLOATED" | sed 's/^/  /'
+  if [ "$AUTO" != "true" ] && [ -t 0 ]; then
+    read -r -p "Rebuild these tables (online, no data is lost)? [Y/n] " rebuild_ans
+  else
+    rebuild_ans="Y"
+  fi
+
+  if [[ $rebuild_ans == "n" ]] || [[ $rebuild_ans == "N" ]]; then
+    echo "Skipping table rebuild."
+  else
+    echo "Rebuilding tables..."
+    sql -S -name "$DB_CONN_NAME" <<'SQL'
+define MODE=run
+@./scripts/sql/rebuild_bloated_tables.sql
+SQL
+  fi
+fi
+
 # Tier 3: reclaim space (non-destructive), in three steps:
 #   1. SHRINK SPACE the FLOWS_FILES LOB to release dead space into the tablespace.
 #   2. dbms_space.shrink_tablespace to compact segments.

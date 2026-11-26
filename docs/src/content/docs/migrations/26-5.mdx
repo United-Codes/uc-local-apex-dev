@@ -38,7 +38,7 @@ For a first install, see the [setup instructions](/products/uc-local-apex-dev/do
 
 <Aside type="note">
   A delete does not return space to the operating system. The jobs stop the tables from growing.
-  `shrink-space` returns the space.
+  `UC_LOGGER_PURGE` also shrinks the `LOGGER_LOGS` tables. `shrink-space` returns the space to the operating system.
 </Aside>
 
 ## Migration
@@ -110,7 +110,9 @@ Install or upgrade utPLSQL:
 
 ### Reclaim space
 
-`shrink-space` asks two questions. The first question is about the purge of the audit records. A purge deletes the audit history. The second question is about the drop of old APEX schemas. A drop cannot be undone.
+`shrink-space` asks three questions. The first question is about the purge of the audit records. A purge deletes the audit history. The second question is about the drop of old APEX schemas. A drop cannot be undone. The third question is about the rebuild of bloated tables. A rebuild loses no data.
+
+A bloated table is a table with a segment of 50MB or more and live rows below half of the segment. A delete does not make such a segment smaller. The rebuild does.
 
 Run `shrink-space` to return the freed space:
 

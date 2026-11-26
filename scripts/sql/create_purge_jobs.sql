@@ -6,7 +6,9 @@ set serveroutput on
 -- Same idea for the two other log tables that grow without a limit on a dev
 -- database: APEX debug messages and Logger. Both jobs keep 7 days. A delete does
 -- not return space to the operating system -- it stops the segment from growing.
--- shrink-space compacts the segments afterwards.
+-- The Logger job also shrinks the table, so the space returns to the tablespace.
+-- shrink-space then resizes the datafile. APEX owns its debug tables, so the APEX
+-- job only deletes.
 --
 -- APEX: apex_debug.remove_debug_by_age works per application, and it needs the
 -- workspace of that application, so the job loops over all applications.
@@ -63,6 +65,16 @@ begin
       execute immediate 'delete from ' || dbms_assert.enquote_name(r.owner) ||
         '.logger_logs where time_stamp < systimestamp - 7 and logger_level >= 2';
       commit;
+      -- A delete keeps the segment at its largest size. Shrink the table, so the
+      -- space returns to the tablespace. SHRINK SPACE needs row movement.
+      begin
+        execute immediate 'alter table ' || dbms_assert.enquote_name(r.owner) ||
+          '.logger_logs enable row movement';
+        execute immediate 'alter table ' || dbms_assert.enquote_name(r.owner) ||
+          '.logger_logs shrink space cascade';
+      exception when others then
+        null;
+      end;
     exception when others then
       null;
     end;

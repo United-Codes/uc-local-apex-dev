@@ -69,7 +69,7 @@ See [Install Apps or Scripts](/products/uc-local-apex-dev/docs/getting-started/i
 | ------- | ----------- |
 | `used-space` | Show the used database space per tablespace, against the 12GB limit of the Free edition. `--summary` gives `key=value` lines, and `--quiet` gives the exit code alone. The exit code is `0` for OK, `10` for `WARNING`, and `11` for `CRITICAL`. |
 | `cap-tablespaces` | Give every datafile a size ceiling, so one datafile cannot fill the 12GB limit alone. `--check` reports and changes nothing. `--apply` sets the ceilings. `-y` skips the confirmation. |
-| `shrink-space` | Shrink tablespaces and datafiles to reclaim unused space. The command asks two questions. With `--auto`, it does not ask. It purges the audit records and keeps the old APEX schemas. |
+| `shrink-space` | Shrink tablespaces and datafiles to reclaim unused space. The command asks three questions. With `--auto`, it does not ask. It purges the audit records, keeps the old APEX schemas, and rebuilds the bloated tables. |
 | `compress-space <name>` | Enable Advanced Compression on the tablespace of a schema, rebuild its objects in compressed form, and return the free space to the operating system. `-y` skips the confirmation. |
 | `create-purge-jobs` | Create the jobs `UC_APEX_DEBUG_PURGE` and `UC_LOGGER_PURGE`. Each job keeps 7 days of data. The command runs both jobs one time. |
 

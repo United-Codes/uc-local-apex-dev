@@ -17,6 +17,16 @@ guide. The release notes on GitHub hold the pull requests and the contributors.
 - New script `scripts/create-purge-jobs.sh` (`local-26ai.sh create-purge-jobs`).
   It creates the jobs `UC_APEX_DEBUG_PURGE` and `UC_LOGGER_PURGE`. Each job keeps
   7 days of data. `after-first-db-start.sh` creates both jobs on a new install.
+  `UC_LOGGER_PURGE` also shrinks the `LOGGER_LOGS` tables after the delete. Run
+  `create-purge-jobs` again to update an existing job.
+
+### Shrink space
+
+- `shrink-space` rebuilds bloated tables. A delete does not lower the high-water mark of a table.
+  A table with a segment of 50MB or more and live rows below half of the segment is bloated.
+  The command lists these tables and asks before it rebuilds them. With `--auto`, it does not ask.
+  It runs `alter table ... move online` and rebuilds the indexes online. Tables of Oracle-maintained
+  schemas, partitioned tables, and tables with a domain or vector index stay as they are.
 
 ### Backup and restore
 
