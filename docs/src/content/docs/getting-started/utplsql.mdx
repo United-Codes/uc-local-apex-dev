@@ -42,10 +42,12 @@ For an example of how to write a test, see the [utPLSQL getting started guide](h
 The same command upgrades utPLSQL to the latest release. If that version is already installed, the command stops and changes nothing.
 
 <Aside type="caution" title="install-utplsql drops the UTPLSQL schema">
+  Before you run `install-utplsql`, back up the objects that you created in
+  `UTPLSQL`.
   For an upgrade, a downgrade, or `--force`, `install-utplsql` drops the schema
-  `UTPLSQL` and its objects. It also drops every public synonym that points to
-  `UTPLSQL`, also synonyms that you created. Back up your own objects in this
-  schema first. The command keeps the `TBS_UTPLSQL` tablespace.
+  `UTPLSQL` and its objects. It drops every public synonym that points to
+  `UTPLSQL`, including synonyms that you created. The command keeps the
+  `TBS_UTPLSQL` tablespace.
 </Aside>
 
 Run the install command again to upgrade:

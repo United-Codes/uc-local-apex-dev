@@ -25,9 +25,12 @@ For a first install, see the [setup instructions](/products/uc-local-apex-dev/do
   - The utPLSQL documentation says an upgrade needs a remove and a new install. If another version is installed, the command drops the schema `UTPLSQL` and its objects and creates it again. It also drops every public synonym that points to `UTPLSQL`, also synonyms that you created. The command keeps the tablespace `TBS_UTPLSQL`.
   - If the installed version is the target version, the command does nothing. Use `--force` to install again. Use `install-utplsql 3.2.2` to install a specific release.
 - New script `scripts/fix-jvm.sh` (`local-26ai.sh fix-jvm`). A change of the database image can stop the in-database JVM without a message. The script tests the JVM and reloads it if it is broken.
-- New script `scripts/export-gaps.sh` (`local-26ai.sh export-gaps`). It shows what a schema export does not carry. It writes SQL files for the roles, grants, public synonyms, network entries, policies, and other objects. `backup-all` runs it first and also backs up the schemas that are not in `.env`. `import-all` runs the files and then compares every object with the backup. The files also restore scheduler windows, Resource Manager plans, editions, proxy users, and the files of custom directories. The list of secrets that no backup holds is shown at the end. See [Backups](/products/uc-local-apex-dev/docs/getting-started/backups/).
+- New script `scripts/export-gaps.sh` (`local-26ai.sh export-gaps`). `backup-all` now
+  includes database schemas without entries in `.env`. It also saves recovery files
+  that `import-all` uses to restore objects outside the schema dumps. See
+  [Backups](/products/uc-local-apex-dev/docs/getting-started/backups/).
 - New script `scripts/test-backup-fixtures.sh`. It creates hand-made objects on a test database and compares them before and after a `rebuild`.
-- New script `scripts/rebuild.sh` (`local-26ai.sh rebuild`). It runs a backup, deletes the database volume, installs a new database, and imports everything.
+- New script `scripts/rebuild.sh` (`local-26ai.sh rebuild`). It backs up the database and shows the restore gaps before it asks for confirmation. It then deletes the database volume, installs a new database, and imports the backup.
 - `import-all` has the options `-y` (no confirmation) and `-j N` (N parallel DataPump imports). On Linux, `import-all` stopped after the first schema. This change corrects that failure.
 - `backup-user` and `import-backup` copy only the dump of their own schema now. `backup-user` stops if the export produced no new dump. Before this change, a failed export sometimes used an old dump.
 - `docker-compose.yml` reads the container name, the volume name, and the host ports from `.env`: `CONTAINER_NAME`, `DB_VOLUME_NAME`, `DB_HOST_PORT`, `ORDS_HTTP_PORT`, and `ORDS_HTTPS_PORT`. Without these keys, the names and ports do not change. To run a second database on the same host, use a second clone of the repository. Set these keys and also `COMPOSE_PROJECT_NAME`, `DB_CONN_BASE`, and `DB_CONN_NAME` in its `.env`. The first `start` after the update creates the containers again. The data stays in the volume. Run `stop` before you update the repository. If a key is also set in your shell, the shell value wins.
@@ -96,7 +99,10 @@ Install or upgrade utPLSQL:
 
 `shrink-space` asks three questions. The first question is about the purge of the audit records. A purge deletes the audit history. The second question is about the drop of old APEX schemas. A drop cannot be undone. The third question is about the rebuild of bloated tables. A rebuild loses no data.
 
-A bloated table is a table with a segment of 50MB or more and live rows below half of the segment. A delete does not make such a segment smaller. The rebuild does.
+For a table with a segment of 50MB or more, `shrink-space` compares estimated row
+storage with the segment size. If the estimate is less than half the segment
+size, the command treats the table as bloated. A delete does not make such a
+segment smaller. The rebuild does.
 
 Run `shrink-space` to return the freed space:
 

@@ -17,9 +17,9 @@ You can do the upgrade in two ways:
 | --- | --- | --- |
 | Time | Some minutes | Approximately 30 minutes and more. The time increases with the size of your data. |
 | Data | The datafiles stay. | The data moves into a new database. |
-| New features of the release update | Features that need new dictionary objects do not work. | Everything works. |
-| In-database JVM | Stops. `fix-jvm` repairs it. | Works. |
-| Secrets | Stay. | You must enter them again. `unrecoverable.txt` lists them. |
+| New features of the release update | Features that need new dictionary objects do not work. | The new database includes the dictionary objects for this release update. |
+| In-database JVM | The image swap can stop it. `fix-jvm` repairs it. | The new database includes the JVM for this release update. |
+| Restore gaps | The existing database keeps its data and secrets. | `unrecoverable.txt` lists items that need manual recovery, including secrets. |
 
 Use the image swap for a fast upgrade. Use export and import if you need the new
 features, or if you want a clean database.
@@ -102,19 +102,21 @@ backup holds.
 
 4. Run the rebuild:
 
+   <Aside type="caution" title="rebuild deletes the database volume">
+     Before you run `rebuild`, copy `./backups/export` to a location outside the
+     repository. If you changed the ORDS configuration, copy `./ords-config` too.
+     `rebuild` deletes the database volume and the contents of `./ords-config`.
+   </Aside>
+
    ```sh
    ./local-26ai.sh rebuild
    ```
 
-   The command backs up every schema first. It then shows the things that no backup
-   holds. Type the volume name to continue.
+   The command runs `backup-all` first. Before you type the volume name, review
+   the restore gaps that `rebuild` shows.
 
-5. Enter the secrets again. The file `./backups/import/recovery/unrecoverable.txt` lists them.
+5. Review the items in `./backups/import/recovery/unrecoverable.txt`. Complete the
+   applicable steps in the [Backups guide](/products/uc-local-apex-dev/docs/getting-started/backups/#what-a-schema-export-does-not-carry).
 
-<Aside type="caution" title="rebuild deletes the database volume">
-  `rebuild` also deletes the contents of `./ords-config`. If you changed the ORDS
-  configuration, copy it first. Copy `./backups/export` to a location outside the
-  repository before step 4. If a step after the delete fails, the backup is in
-  `./backups/import`. Run `./install.sh` and then `./local-26ai.sh import-all -y`
-  to continue.
-</Aside>
+If a step fails after `rebuild` deletes the volume, use the backup in
+`./backups/import`. Run `./install.sh`. Then run `./local-26ai.sh import-all -y`.

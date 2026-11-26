@@ -29,7 +29,9 @@ guide. The release notes on GitHub hold the pull requests and the contributors.
 ### Shrink space
 
 - `shrink-space` rebuilds bloated tables. A delete does not lower the high-water mark of a table.
-  A table with a segment of 50MB or more and live rows below half of the segment is bloated.
+  For a table with a segment of 50MB or more, `shrink-space` compares estimated row
+  storage with the segment size. If the estimate is less than half the segment
+  size, the command treats the table as bloated.
   The command lists these tables and asks before it rebuilds them. With `--auto`, it does not ask.
   It runs `alter table ... move online` and rebuilds the indexes online. Tables of Oracle-maintained
   schemas, partitioned tables, and tables with a domain or vector index stay as they are.
@@ -44,10 +46,12 @@ guide. The release notes on GitHub hold the pull requests and the contributors.
   proxy users, default roles, and wallet access entries. `export-gaps` copies the
   files of custom directories into the backup.
 - The SQL files restore assertions and schema privileges (`grant ... on schema`).
-  DataPump does not carry them. `export-gaps` writes the Select AI profiles to `ai_profiles.sql`.
+  `10_post.sql` clears leftover assertion helper tables before it creates the assertions.
+  `export-gaps` writes the Select AI profiles to `ai_profiles.sql`. Run each block as the profile owner.
 - `export-gaps` lists what no backup holds: secrets, objects in other editions, SQL
   plan baselines, and SQL Firewall allow lists.
-- `import-all` compares every object by name with the backup, not only the counts.
+- `import-all` compares object names and column domain links with the backup.
+  If an expected entry is missing, the command exits with code `1`.
 - `import-all` sets the vector memory of the old database and creates SQL domains
   whose DataPump DDL is broken. `rebuild` installs DBMS_CLOUD and utPLSQL if the
   old database had them.
@@ -61,8 +65,9 @@ guide. The release notes on GitHub hold the pull requests and the contributors.
 - `backup-user` exports the ORDS definitions as `SYS`. A schema that is not in
   `.env` gets a temporary password only for the APEX export and the ORDS import.
 - The backup and the import work for schema-only accounts (`no authentication`).
-- New script `scripts/rebuild.sh` (`local-26ai.sh rebuild`). It runs a backup,
-  deletes the database volume, installs a new database, and imports everything.
+- New script `scripts/rebuild.sh` (`local-26ai.sh rebuild`). It backs up the
+  database and shows the restore gaps before it asks for confirmation. It then
+  deletes the database volume, installs a new database, and imports the backup.
 - `import-all` has the options `-y` and `-j N`. `-j N` runs the DataPump import of
   N schemas at the same time.
 - `backup-user` and `import-backup` copy only the files of their own schema.

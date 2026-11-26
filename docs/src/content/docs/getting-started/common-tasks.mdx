@@ -54,7 +54,8 @@ Then open https://localhost:8443/ords. ORDS uses port 8443 for HTTPS, not port 8
 
 ### Check Database Space Usage
 
-The Free edition of the database has a space limit of 12GB. Show the used space with this command:
+Oracle Database Free limits the datafiles in a PDB to 12GB. Run `used-space` to
+show the allocated space and its status.
 
 ```bash
 local-26ai.sh used-space
@@ -71,8 +72,8 @@ local-26ai.sh used-space
 # TBS_AOP                          77          7         70           91
 ```
 
-The status is `WARNING` above 9.5GB and `CRITICAL` above 11GB. The
-command also gives the same answer as an exit code, so a script can use it:
+By default, `WARNING` starts at 9.5GB and `CRITICAL` starts at 11GB. Each status
+has an exit code.
 
 | Exit code | Meaning |
 | --------- | ------- |
@@ -99,12 +100,13 @@ To change the two thresholds, set `SPACE_WARN_GB` and `SPACE_CRIT_GB` in your
 `.env` file. The warning threshold is below the limit on purpose. Every way to
 make a full database smaller needs free space to work in.
 
-The `stop` command runs the same check before it shuts the database down. This is
-the last point at which you can act, because a database that is above the limit
-does not open again. If the status is `CRITICAL`, the command runs `shrink-space --auto`
-first. If the status is still `CRITICAL` afterward, the command does not stop the
-database and exits with code `11`. To skip the shrink and stop the database
-anyway, run `local-26ai.sh stop --force`.
+The `stop` command reads the space status while the PDB is open. If the status
+is `CRITICAL`, the command runs `shrink-space --auto` before shutdown. If the
+status stays `CRITICAL`, `stop` leaves the database running and exits with code
+`11`. To skip the shrink and stop the database, run `local-26ai.sh stop --force`.
+
+If the PDB exceeds the 12GB limit, its next open fails with `ORA-12954`. At that
+point, commands inside the PDB cannot free space. See [Recover the database](/products/uc-local-apex-dev/docs/other/faq/#recover-the-database).
 
 ### Limit the Size of the Datafiles
 
